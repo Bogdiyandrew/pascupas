@@ -5,6 +5,7 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc } from 'firebase/firestore';
 
 // --- Configurare Firebase (înlocuiește cu datele tale) ---
+// Asigură-te că ai un fișier .env.local cu aceste variabile
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -25,7 +26,6 @@ interface Message {
 }
 
 // --- Componente Iconițe (SVG-uri pentru performanță) ---
-const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-accent-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
 const LockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>;
 const HeartIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 20.25l-7.682-7.682a4.5 4.5 0 010-6.364z" /></svg>;
 const BrainIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 8h6m-5 4h4m5 5H5a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v10a2 2 0 01-2 2z" /></svg>;
@@ -110,6 +110,7 @@ const ChatDemo = () => {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+    setError('');
 
     try {
       const response = await fetch('/api/chat', {
@@ -122,8 +123,12 @@ const ChatDemo = () => {
 
       const data = await response.json();
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+        if (err instanceof Error) {
+            setError(err.message);
+        } else {
+            setError('A apărut o eroare necunoscută.');
+        }
     } finally {
       setIsLoading(false);
     }
@@ -223,7 +228,7 @@ const SocialProofSection = () => (
         <div className="container mx-auto text-center max-w-2xl">
             <h3 className="font-poppins font-bold text-3xl text-text mb-4">Mii de conversații au început deja</h3>
             <p className="text-gray-600 text-lg">
-                "Am fost surprins de cât de naturală a fost conversația. Chiar m-a ajutat să-mi pun ordine în gânduri într-un moment dificil." – un utilizator anonim.
+                “Am fost surprins de cât de naturală a fost conversația. Chiar m-a ajutat să-mi pun ordine în gânduri într-un moment dificil.” – un utilizator anonim.
             </p>
         </div>
     </section>
