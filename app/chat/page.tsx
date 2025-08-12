@@ -1,9 +1,22 @@
 'use client';
 
 import { useState, useRef, useEffect, FormEvent } from 'react';
-import { db } from '../../lib/firebase'; 
-import { collection, addDoc } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase'; 
+import { 
+  collection, 
+  addDoc, 
+  doc, 
+  setDoc, 
+  query, 
+  where, 
+  getDocs, 
+  orderBy, 
+  Timestamp,
+  getDoc
+} from 'firebase/firestore';
 import Header from '@/components/Header';
+import { useAuth } from '@/context/AuthContext';
 
 // --- Tipuri de date ---
 interface Message {
@@ -11,32 +24,86 @@ interface Message {
   content: string;
 }
 
+interface Conversation {
+  id: string;
+  title: string;
+  createdAt: Timestamp;
+}
+
 // --- Componente Iconițe ---
 const SendIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>;
 const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>;
-const StarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>;
 const HistoryIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 
 
 export default function ChatPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'Salut! Sunt gata să te ascult. Cu ce-ți pot fi de ajutor?' }
   ]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  // --- Efecte (Hooks) ---
+
+  // Protejarea paginii și încărcarea conversațiilor
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.push('/');
+      } else {
+        fetchConversations();
+      }
+    }
+  }, [user, authLoading, router]);
+
+  // Scroll automat la ultimul mesaj
   useEffect(() => {
     chatContainerRef.current?.scrollTo(0, chatContainerRef.current.scrollHeight);
   }, [messages]);
 
+  // --- Funcții de Bază ---
+
+  const fetchConversations = async () => {
+    if (!user) return;
+    const q = query(collection(db, "conversations"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    const convos = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      title: doc.data().title,
+      createdAt: doc.data().createdAt
+    }));
+    setConversations(convos);
+  };
+
+  const startNewConversation = () => {
+    setActiveConversationId(null);
+    setMessages([{ role: 'assistant', content: 'Salut! Sunt gata să te ascult. Cu ce-ți pot fi de ajutor?' }]);
+  };
+
+  const selectConversation = async (id: string) => {
+    setActiveConversationId(id);
+    const docRef = doc(db, "conversations", id);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      setMessages(docSnap.data().messages);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !user) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInput('');
     setIsLoading(true);
     setError('');
@@ -45,26 +112,45 @@ export default function ChatPage() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...messages, userMessage] }),
+        body: JSON.stringify({ messages: newMessages }),
       });
 
       if (!response.ok) throw new Error('A apărut o eroare. Te rog, încearcă din nou.');
 
       const data = await response.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
-      
-      // TODO: Salvează conversația în Firestore pentru utilizatorul logat
-      
+      const aiMessage: Message = { role: 'assistant', content: data.response };
+      const finalMessages = [...newMessages, aiMessage];
+      setMessages(finalMessages);
+
+      // --- Logica de Salvare în Firestore ---
+      if (activeConversationId) {
+        // Actualizează conversația existentă
+        const docRef = doc(db, "conversations", activeConversationId);
+        await setDoc(docRef, { messages: finalMessages }, { merge: true });
+      } else {
+        // Creează o conversație nouă
+        const newConversation = {
+          userId: user.uid,
+          title: userMessage.content.substring(0, 40) + '...',
+          messages: finalMessages,
+          createdAt: Timestamp.now()
+        };
+        const docRef = await addDoc(collection(db, "conversations"), newConversation);
+        setActiveConversationId(docRef.id);
+        fetchConversations(); // Reîncarcă lista de conversații
+      }
+
     } catch (err: unknown) {
-        if (err instanceof Error) {
-            setError(err.message);
-        } else {
-            setError('A apărut o eroare necunoscută.');
-        }
+        if (err instanceof Error) { setError(err.message); } 
+        else { setError('A apărut o eroare necunoscută.'); }
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (authLoading || !user) {
+    return <div className="flex items-center justify-center h-screen">Se încarcă...</div>;
+  }
 
   return (
     <>
@@ -72,23 +158,23 @@ export default function ChatPage() {
       <div className="flex h-[calc(100vh-88px)]">
         {/* --- Bara Laterală (Sidebar) --- */}
         <aside className="w-1/4 bg-background border-r border-gray-200 p-6 flex flex-col">
-          <button className="flex items-center justify-center gap-2 w-full bg-primary text-white font-bold p-3 rounded-lg hover:bg-opacity-90 transition-colors mb-8">
+          <button onClick={startNewConversation} className="flex items-center justify-center gap-2 w-full bg-primary text-white font-bold p-3 rounded-lg hover:bg-opacity-90 transition-colors mb-8">
             <PlusIcon />
             Conversație Nouă
           </button>
           
           <div className="flex-grow overflow-y-auto">
             <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2"><HistoryIcon /> Istoric</h2>
-            {/* Placeholder pentru istoric */}
             <div className="space-y-2">
-              <p className="p-2 rounded-lg hover:bg-gray-200 cursor-pointer text-sm truncate">O discuție despre anxietate...</p>
-              <p className="p-2 rounded-lg hover:bg-gray-200 cursor-pointer text-sm truncate">Planuri de viitor și frici...</p>
-            </div>
-
-            <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wider mt-8 mb-4 flex items-center gap-2"><StarIcon /> Favorite</h2>
-            {/* Placeholder pentru favorite */}
-            <div className="space-y-2">
-               <p className="p-2 rounded-lg hover:bg-gray-200 cursor-pointer text-sm truncate">Tehnica de respirație 4-7-8</p>
+              {conversations.map(convo => (
+                <p 
+                  key={convo.id} 
+                  onClick={() => selectConversation(convo.id)}
+                  className={`p-2 rounded-lg cursor-pointer text-sm truncate ${activeConversationId === convo.id ? 'bg-primary/20 text-primary font-bold' : 'hover:bg-gray-200'}`}
+                >
+                  {convo.title}
+                </p>
+              ))}
             </div>
           </div>
         </aside>
