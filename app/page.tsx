@@ -193,7 +193,7 @@ const ChatDemo = () => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Scrie mesajul tău aici..."
-                  className="w-full p-3 border rounded-full focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 border rounded-full focus:ring-2 focus:ring-primary bg-white text-black placeholder-gray-500"
                   disabled={isLoading}
                 />
                 <button type="submit" className="bg-primary p-3 rounded-full text-white hover:bg-opacity-90 transition-colors disabled:bg-gray-400" disabled={isLoading || !input.trim()}>
