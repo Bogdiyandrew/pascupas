@@ -283,7 +283,7 @@ export default function ChatPage() {
                 className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-xl p-4 rounded-2xl prose prose-sm max-w-none ${
+                  className={`max-w-xl p-4 rounded-2xl prose prose-sm ${
                     msg.role === 'user'
                       ? 'bg-primary text-white rounded-br-none prose-invert'
                       : 'bg-gray-200 text-text rounded-bl-none'
