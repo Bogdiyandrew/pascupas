@@ -129,15 +129,22 @@ export default function ChatPage() {
         await setDoc(docRef, { messages: finalMessages }, { merge: true });
       } else {
         // Creează o conversație nouă
-        const newConversation = {
+        const newConversationData = {
           userId: user.uid,
           title: userMessage.content.substring(0, 40) + '...',
           messages: finalMessages,
           createdAt: Timestamp.now()
         };
-        const docRef = await addDoc(collection(db, "conversations"), newConversation);
+        const docRef = await addDoc(collection(db, "conversations"), newConversationData);
+        
+        // **CORECTAT**: Actualizăm starea locală pentru un UI instantaneu
+        const newConversationForState: Conversation = {
+          id: docRef.id,
+          title: newConversationData.title,
+          createdAt: newConversationData.createdAt
+        };
+        setConversations(prevConvos => [newConversationForState, ...prevConvos]);
         setActiveConversationId(docRef.id);
-        fetchConversations(); // Reîncarcă lista de conversații
       }
 
     } catch (err: unknown) {
