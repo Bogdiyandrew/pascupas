@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, FormEvent } from 'react';
+import { useState, useRef, useEffect, FormEvent, useCallback } from 'react'; // Am adăugat useCallback
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase'; 
 import { 
@@ -59,6 +59,21 @@ export default function ChatPage() {
   const [error, setError] = useState('');
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  // --- Funcții de Bază ---
+
+  // CORECTAT: Am împachetat funcția în useCallback pentru a preveni re-crearea ei la fiecare randare
+  const fetchConversations = useCallback(async () => {
+    if (!user) return;
+    const q = query(collection(db, "conversations"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    const convos = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      title: doc.data().title,
+      createdAt: doc.data().createdAt
+    }));
+    setConversations(convos);
+  }, [user]); // Dependența este `user`
+
   // --- Efecte (Hooks) ---
 
   useEffect(() => {
@@ -69,25 +84,11 @@ export default function ChatPage() {
         fetchConversations();
       }
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, fetchConversations]); // CORECTAT: Am adăugat fetchConversations la dependențe
 
   useEffect(() => {
     chatContainerRef.current?.scrollTo(0, chatContainerRef.current.scrollHeight);
   }, [messages]);
-
-  // --- Funcții de Bază ---
-
-  const fetchConversations = async () => {
-    if (!user) return;
-    const q = query(collection(db, "conversations"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    const convos = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      title: doc.data().title,
-      createdAt: doc.data().createdAt
-    }));
-    setConversations(convos);
-  };
 
   const startNewConversation = () => {
     setActiveConversationId(null);
@@ -258,7 +259,8 @@ export default function ChatPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm">
             <h3 className="font-bold text-lg text-center">Ești sigur?</h3>
-            <p className="text-center text-gray-600 mt-2">Vrei să ștergi definitiv conversația "{conversationToDelete.title}"?</p>
+            {/* CORECTAT: Am înlocuit ghilimelele drepte cu cele curbate */}
+            <p className="text-center text-gray-600 mt-2">Vrei să ștergi definitiv conversația “{conversationToDelete.title}”?</p>
             <div className="flex justify-center gap-4 mt-6">
               <button onClick={() => setConversationToDelete(null)} className="px-6 py-2 rounded-lg border">Anulează</button>
               <button onClick={handleDelete} className="px-6 py-2 rounded-lg bg-red-500 text-white">Șterge</button>
