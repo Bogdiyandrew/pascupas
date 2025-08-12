@@ -30,6 +30,7 @@ interface Conversation {
   id: string;
   title: string;
   createdAt: Timestamp;
+  updatedAt: Timestamp; // Adăugat pentru sortare
 }
 
 /* ---------------------- Iconițe simple ---------------------- */
@@ -96,7 +97,7 @@ export default function ChatPage() {
   const [editingTitle, setEditingTitle] = useState('');
   const [conversationToDelete, setConversationToDelete] = useState<Conversation | null>(null);
   
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Stare pentru meniul mobil
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -110,13 +111,12 @@ export default function ChatPage() {
     const q = query(
       collection(db, 'conversations'),
       where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      orderBy('updatedAt', 'desc') // MODIFICAT: Sortează după data actualizării
     );
     const querySnapshot = await getDocs(q);
     const convos = querySnapshot.docs.map((d) => ({
       id: d.id,
-      title: d.data().title,
-      createdAt: d.data().createdAt,
+      ...(d.data() as Omit<Conversation, 'id'>)
     }));
     setConversations(convos);
   }, [user]);
@@ -136,7 +136,7 @@ export default function ChatPage() {
   const startNewConversation = () => {
     setActiveConversationId(null);
     setMessages([{ role: 'assistant', content: 'Salut! Sunt gata să te ascult. Cu ce-ți pot fi de ajutor?' }]);
-    if (window.innerWidth < 768) setIsSidebarOpen(false); // Închide meniul pe mobil
+    if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
   const selectConversation = async (id: string) => {
@@ -147,7 +147,7 @@ export default function ChatPage() {
     if (snap.exists()) {
       setMessages(snap.data().messages);
     }
-    if (window.innerWidth < 768) setIsSidebarOpen(false); // Închide meniul pe mobil
+    if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
   const handleRename = async (id: string, newTitle: string) => {
@@ -173,7 +173,6 @@ export default function ChatPage() {
     const userMessage: Message = { role: 'user', content: text };
     const baseMessages = [...messages, userMessage];
 
-    // afișăm instant mesajul utilizatorului + placeholder pentru AI
     setMessages([...baseMessages, { role: 'assistant', content: '' }]);
     setInput('');
     setIsLoading(true);
@@ -205,21 +204,32 @@ export default function ChatPage() {
       }
 
       const finalMessages = [...baseMessages, { role: 'assistant', content: aiText }];
+      const now = Timestamp.now();
 
-      // persist conversația
       if (activeConversationId) {
         const docRef = doc(db, 'conversations', activeConversationId);
-        await setDoc(docRef, { messages: finalMessages }, { merge: true });
+        await setDoc(docRef, { messages: finalMessages, updatedAt: now }, { merge: true });
+        
+        // MODIFICAT: Reordonează conversațiile în starea locală
+        setConversations(prev => {
+            const convoToMove = prev.find(c => c.id === activeConversationId);
+            if (!convoToMove) return prev;
+            const rest = prev.filter(c => c.id !== activeConversationId);
+            return [{ ...convoToMove, updatedAt: now, title: convoToMove.title }, ...rest];
+        });
+
       } else {
         const newTitle = userMessage.content.substring(0, 40) + (userMessage.content.length > 40 ? '…' : '');
         const data = {
           userId: user.uid,
           title: newTitle,
           messages: finalMessages,
-          createdAt: Timestamp.now(),
+          createdAt: now,
+          updatedAt: now, // Adăugat și la creare
         };
         const docRef = await addDoc(collection(db, 'conversations'), data);
-        setConversations((prev) => [{ id: docRef.id, title: newTitle, createdAt: data.createdAt }, ...prev]);
+        const newConvo = { id: docRef.id, ...data };
+        setConversations((prev) => [newConvo, ...prev]);
         setActiveConversationId(docRef.id);
       }
     } catch (err: unknown) {
@@ -239,7 +249,6 @@ export default function ChatPage() {
     await sendMessage(text);
   };
 
-
   if (authLoading || !user) {
     return <div className="flex items-center justify-center h-screen">Se încarcă...</div>;
   }
@@ -248,10 +257,7 @@ export default function ChatPage() {
     <>
       <Header />
       <div className="flex h-[calc(100vh-88px)] relative overflow-hidden">
-        {/* Overlay pentru meniul mobil */}
         {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-20 md:hidden"></div>}
-
-        {/* Sidebar */}
         <aside className={`absolute top-0 left-0 h-full w-3/4 max-w-xs md:w-1/4 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out bg-background border-r border-gray-200 p-6 flex flex-col z-30`}>
           <button
             onClick={startNewConversation}
@@ -287,7 +293,6 @@ export default function ChatPage() {
           </div>
         </aside>
 
-        {/* Chat */}
         <main className="w-full md:w-3/4 flex flex-col bg-white">
           <div className="p-4 border-b md:hidden flex items-center">
               <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2">
@@ -313,7 +318,6 @@ export default function ChatPage() {
               </div>
             ))}
 
-            {/* SUGESTII DE START */}
             {messages.length === 1 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {startSuggestions.map((s, i) => (
@@ -361,7 +365,6 @@ export default function ChatPage() {
         </main>
       </div>
 
-      {/* Modal ștergere */}
       {conversationToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm mx-4">
