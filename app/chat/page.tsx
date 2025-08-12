@@ -21,7 +21,7 @@ import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
 import ReactMarkdown from 'react-markdown';
 
-/* ---------------------- Tipuri ---------------------- */
+/* ===================== Tipuri ===================== */
 interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -30,10 +30,10 @@ interface Conversation {
   id: string;
   title: string;
   createdAt: Timestamp;
-  updatedAt: Timestamp; // Adăugat pentru sortare
+  updatedAt: Timestamp;
 }
 
-/* ---------------------- Iconițe simple ---------------------- */
+/* ===================== Iconițe ===================== */
 const SendIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
     <path
@@ -69,12 +69,12 @@ const DeleteIcon = () => (
   </svg>
 );
 const MenuIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-    </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+  </svg>
 );
 
-/* ---------------------- Sugestii de start ---------------------- */
+/* ===================== Sugestii start ===================== */
 const startSuggestions = [
   'Vreau să vorbesc despre stres',
   'Mă simt trist/ă',
@@ -83,12 +83,93 @@ const startSuggestions = [
   'Mă simt anxios/anxioasă',
 ];
 
+/* ===================== Consent Modal (soft) ===================== */
+function ConsentModal({
+  onAccept,
+  onDecline,
+  noStore,
+  setNoStore,
+}: {
+  onAccept: () => void;
+  onDecline: () => void;
+  noStore: boolean;
+  setNoStore: (v: boolean) => void;
+}) {
+  const [agree, setAgree] = useState(false);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="consent-title"
+        className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl"
+      >
+        <h2 id="consent-title" className="text-xl font-semibold mb-3">Înainte să începem</h2>
+
+        <p className="text-sm text-gray-700 mb-3">
+          Pentru a-ți răspunde, acest chat procesează mesajele tale cu ajutorul inteligenței artificiale.
+          Informațiile sunt folosite doar pentru funcționarea serviciului și pot fi șterse la cerere.
+          Serviciul <b>nu înlocuiește</b> consilierea unui psiholog.
+        </p>
+
+        <p className="text-xs text-gray-600 mb-3">
+          În urgență, sună la <b>112</b> sau la <a href="tel:0374456420" className="underline">DepreHUB 0374 456 420</a>.
+          Detalii: <a href="/politica-confidentialitate" className="underline">Politica de confidențialitate</a> •{' '}
+          <a href="/termeni" className="underline">Termeni și condiții</a>.
+        </p>
+
+        <label className="flex items-start gap-2 text-sm text-gray-800 mb-2">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4"
+            checked={noStore}
+            onChange={(e) => {
+              setNoStore(e.target.checked);
+              localStorage.setItem('noStore', e.target.checked ? 'true' : 'false');
+            }}
+          />
+          <span>
+            <b>Mod privat</b>: nu salva conversațiile mele. <span className="text-gray-500">Nu voi avea istoric sau reluare.</span>
+          </span>
+        </label>
+
+        <label className="flex items-start gap-2 text-sm text-gray-800 mb-4">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4"
+            checked={agree}
+            onChange={(e) => setAgree(e.target.checked)}
+          />
+          <span><b>Confirm că sunt de acord</b> cu prelucrarea mesajelor mele pentru a putea folosi chatul.</span>
+        </label>
+
+        <div className="flex justify-end gap-3">
+          <button onClick={onDecline} className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">Refuz</button>
+          <button
+            onClick={() => agree && onAccept()}
+            disabled={!agree}
+            className={`px-4 py-2 rounded-lg text-white ${agree ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}
+          >
+            Accept și continui
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ===================== Pagina Chat ===================== */
 export default function ChatPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
+  // Consimțământ GDPR + Mod privat (noStore)
+  const [hasConsented, setHasConsented] = useState(false);
+  const [noStore, setNoStore] = useState(false);
+
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Salut! Sunt gata să te ascult. Cu ce-ți pot fi de ajutor?' },
+    { role: 'assistant', content: 'Salut! Sunt aici să te ascult. Cu ce te pot ajuta?' },
   ]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -96,7 +177,7 @@ export default function ChatPage() {
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [conversationToDelete, setConversationToDelete] = useState<Conversation | null>(null);
-  
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [input, setInput] = useState('');
@@ -105,21 +186,29 @@ export default function ChatPage() {
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  /* ---------------------- Load istoric ---------------------- */
+  /* -------- Consimțământ init -------- */
+  useEffect(() => {
+    const consent = localStorage.getItem('gdprConsent');
+    if (consent === 'true') setHasConsented(true);
+    const ns = localStorage.getItem('noStore');
+    if (ns === 'true') setNoStore(true);
+  }, []);
+
+  /* -------- Load istoric -------- */
   const fetchConversations = useCallback(async () => {
-    if (!user) return;
+    if (!user || noStore) return;
     const q = query(
       collection(db, 'conversations'),
       where('userId', '==', user.uid),
-      orderBy('updatedAt', 'desc') // MODIFICAT: Sortează după data actualizării
+      orderBy('updatedAt', 'desc')
     );
     const querySnapshot = await getDocs(q);
     const convos = querySnapshot.docs.map((d) => ({
       id: d.id,
-      ...(d.data() as Omit<Conversation, 'id'>)
+      ...(d.data() as Omit<Conversation, 'id'>),
     }));
     setConversations(convos);
-  }, [user]);
+  }, [user, noStore]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -132,16 +221,17 @@ export default function ChatPage() {
     chatContainerRef.current?.scrollTo(0, chatContainerRef.current.scrollHeight);
   }, [messages]);
 
-  /* ---------------------- Acțiuni conversații ---------------------- */
+  /* -------- Acțiuni conversații -------- */
   const startNewConversation = () => {
     setActiveConversationId(null);
-    setMessages([{ role: 'assistant', content: 'Salut! Sunt gata să te ascult. Cu ce-ți pot fi de ajutor?' }]);
+    setMessages([{ role: 'assistant', content: 'Salut! Sunt aici să te ascult. Cu ce te pot ajuta?' }]);
     if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
   const selectConversation = async (id: string) => {
     if (editingConversationId === id) return;
     setActiveConversationId(id);
+    if (noStore) return;
     const docRef = doc(db, 'conversations', id);
     const snap = await getDoc(docRef);
     if (snap.exists()) {
@@ -151,7 +241,7 @@ export default function ChatPage() {
   };
 
   const handleRename = async (id: string, newTitle: string) => {
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim() || noStore) return;
     const docRef = doc(db, 'conversations', id);
     await updateDoc(docRef, { title: newTitle });
     setConversations((convos) => convos.map((c) => (c.id === id ? { ...c, title: newTitle } : c)));
@@ -159,16 +249,20 @@ export default function ChatPage() {
   };
 
   const handleDelete = async () => {
-    if (!conversationToDelete) return;
+    if (!conversationToDelete || noStore) return;
     await deleteDoc(doc(db, 'conversations', conversationToDelete.id));
     setConversations((convos) => convos.filter((c) => c.id !== conversationToDelete.id));
     if (activeConversationId === conversationToDelete.id) startNewConversation();
     setConversationToDelete(null);
   };
 
-  /* ---------------------- Streaming helper ---------------------- */
+  /* -------- Trimitere mesaj -------- */
   async function sendMessage(text: string) {
     if (!text.trim() || isLoading || !user) return;
+    if (!hasConsented) {
+      setError('Trebuie să accepți consimțământul GDPR înainte de a continua.');
+      return;
+    }
 
     const userMessage: Message = { role: 'user', content: text };
     const baseMessages = [...messages, userMessage];
@@ -182,7 +276,7 @@ export default function ChatPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: baseMessages }),
+        body: JSON.stringify({ messages: baseMessages, noStore }),
       });
 
       if (!res.ok || !res.body) throw new Error('A apărut o eroare. Încearcă din nou.');
@@ -206,31 +300,31 @@ export default function ChatPage() {
       const finalMessages = [...baseMessages, { role: 'assistant', content: aiText }];
       const now = Timestamp.now();
 
-      if (activeConversationId) {
-        const docRef = doc(db, 'conversations', activeConversationId);
-        await setDoc(docRef, { messages: finalMessages, updatedAt: now }, { merge: true });
-        
-        // MODIFICAT: Reordonează conversațiile în starea locală
-        setConversations(prev => {
-            const convoToMove = prev.find(c => c.id === activeConversationId);
-            if (!convoToMove) return prev;
-            const rest = prev.filter(c => c.id !== activeConversationId);
-            return [{ ...convoToMove, updatedAt: now, title: convoToMove.title }, ...rest];
-        });
+      if (!noStore) {
+        if (activeConversationId) {
+          const docRef = doc(db, 'conversations', activeConversationId);
+          await setDoc(docRef, { messages: finalMessages, updatedAt: now }, { merge: true });
 
-      } else {
-        const newTitle = userMessage.content.substring(0, 40) + (userMessage.content.length > 40 ? '…' : '');
-        const data = {
-          userId: user.uid,
-          title: newTitle,
-          messages: finalMessages,
-          createdAt: now,
-          updatedAt: now, // Adăugat și la creare
-        };
-        const docRef = await addDoc(collection(db, 'conversations'), data);
-        const newConvo = { id: docRef.id, ...data };
-        setConversations((prev) => [newConvo, ...prev]);
-        setActiveConversationId(docRef.id);
+          setConversations((prev) => {
+            const convoToMove = prev.find((c) => c.id === activeConversationId);
+            if (!convoToMove) return prev;
+            const rest = prev.filter((c) => c.id !== activeConversationId);
+            return [{ ...convoToMove, updatedAt: now, title: convoToMove.title }, ...rest];
+          });
+        } else {
+          const newTitle = userMessage.content.substring(0, 40) + (userMessage.content.length > 40 ? '…' : '');
+          const data = {
+            userId: user.uid,
+            title: newTitle,
+            messages: finalMessages,
+            createdAt: now,
+            updatedAt: now,
+          };
+          const docRef = await addDoc(collection(db, 'conversations'), data);
+          const newConvo = { id: docRef.id, ...data };
+          setConversations((prev) => [newConvo, ...prev]);
+          setActiveConversationId(docRef.id);
+        }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'A apărut o eroare necunoscută.');
@@ -239,78 +333,122 @@ export default function ChatPage() {
     }
   }
 
-  /* ---------------------- Handlere UI ---------------------- */
+  /* -------- Handlere UI -------- */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     await sendMessage(input);
   };
-
   const handleSuggestionClick = async (text: string) => {
     await sendMessage(text);
   };
 
+  /* -------- Auth state -------- */
   if (authLoading || !user) {
     return <div className="flex items-center justify-center h-screen">Se încarcă...</div>;
   }
 
+  /* -------- Pop-up consimțământ -------- */
+  if (!hasConsented) {
+    return (
+      <>
+        <Header />
+        <ConsentModal
+          onAccept={() => {
+            setHasConsented(true);
+            localStorage.setItem('gdprConsent', 'true');
+          }}
+          onDecline={() => router.push('/')}
+          noStore={noStore}
+          setNoStore={(v) => setNoStore(v)}
+        />
+      </>
+    );
+  }
+
+  /* ===================== UI principal ===================== */
   return (
     <>
       <Header />
       <div className="flex h-[calc(100vh-88px)] relative overflow-hidden">
         {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-20 md:hidden"></div>}
-        <aside className={`absolute top-0 left-0 h-full w-3/4 max-w-xs md:w-1/4 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out bg-background border-r border-gray-200 p-6 flex flex-col z-30`}>
+
+        <aside
+          className={`absolute top-0 left-0 h-full w-3/4 max-w-xs md:w-1/4 md:relative transform ${
+            isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } md:translate-x-0 transition-transform duration-300 ease-in-out bg-background border-r border-gray-200 p-6 flex flex-col z-30`}
+        >
           <button
             onClick={startNewConversation}
-            className="flex items-center justify-center gap-2 w-full bg-primary text-white font-bold p-3 rounded-lg hover:bg-opacity-90 transition-colors mb-8"
+            className="flex items-center justify-center gap-2 w-full bg-primary text-white font-bold p-3 rounded-lg hover:bg-opacity-90 transition-colors mb-4"
           >
             <PlusIcon />
             Conversație Nouă
           </button>
+
+          {/* Toggle mod privat + micro-disclaimer */}
+          <div className="mb-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={noStore}
+                onChange={(e) => {
+                  setNoStore(e.target.checked);
+                  localStorage.setItem('noStore', e.target.checked ? 'true' : 'false');
+                  if (e.target.checked) setConversations([]);
+                }}
+              />
+              <span>Mod privat (nu salva conversațiile)</span>
+            </label>
+            <p className="text-[11px] text-gray-500 mt-1">Nu înlocuiește un psiholog. În criză, sună la 112.</p>
+          </div>
+
           <div className="flex-grow overflow-y-auto pr-2">
-            <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
               <HistoryIcon /> Istoric
             </h2>
-            <div className="space-y-2">
-              {conversations.map((convo) => (
-                <ConversationItem
-                  key={convo.id}
-                  convo={convo}
-                  isActive={activeConversationId === convo.id}
-                  isEditing={editingConversationId === convo.id}
-                  onSelect={() => selectConversation(convo.id)}
-                  onStartEdit={() => {
-                    setEditingConversationId(convo.id);
-                    setEditingTitle(convo.title);
-                  }}
-                  onCancelEdit={() => setEditingConversationId(null)}
-                  onSaveEdit={(newTitle) => handleRename(convo.id, newTitle)}
-                  onDelete={() => setConversationToDelete(convo)}
-                  editingTitle={editingTitle}
-                  setEditingTitle={setEditingTitle}
-                />
-              ))}
-            </div>
+
+            {!noStore ? (
+              <div className="space-y-2">
+                {conversations.map((convo) => (
+                  <ConversationItem
+                    key={convo.id}
+                    convo={convo}
+                    isActive={activeConversationId === convo.id}
+                    isEditing={editingConversationId === convo.id}
+                    onSelect={() => selectConversation(convo.id)}
+                    onStartEdit={() => {
+                      setEditingConversationId(convo.id);
+                      setEditingTitle(convo.title);
+                    }}
+                    onCancelEdit={() => setEditingConversationId(null)}
+                    onSaveEdit={(newTitle) => handleRename(convo.id, newTitle)}
+                    onDelete={() => setConversationToDelete(convo)}
+                    editingTitle={editingTitle}
+                    setEditingTitle={setEditingTitle}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500">Istoricul este dezactivat în mod privat.</div>
+            )}
           </div>
         </aside>
 
         <main className="w-full md:w-3/4 flex flex-col bg-white">
           <div className="p-4 border-b md:hidden flex items-center">
-              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2">
-                  <MenuIcon />
-              </button>
-              <h2 className="font-bold text-lg">Chat</h2>
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2">
+              <MenuIcon />
+            </button>
+            <h2 className="font-bold text-lg">Chat</h2>
           </div>
+
           <div ref={chatContainerRef} className="flex-grow p-4 md:p-6 space-y-4 overflow-y-auto">
             {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+              <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
                   className={`max-w-lg md:max-w-xl p-3 md:p-4 rounded-2xl prose prose-sm ${
-                    msg.role === 'user'
-                      ? 'bg-primary text-white rounded-br-none prose-invert'
-                      : 'bg-gray-200 text-text rounded-bl-none'
+                    msg.role === 'user' ? 'bg-primary text-white rounded-br-none prose-invert' : 'bg-gray-200 text-text rounded-bl-none'
                   }`}
                 >
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -365,20 +503,14 @@ export default function ChatPage() {
         </main>
       </div>
 
-      {conversationToDelete && (
+      {conversationToDelete && !noStore && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm mx-4">
             <h3 className="font-bold text-lg text-center">Ești sigur?</h3>
-            <p className="text-center text-gray-600 mt-2">
-              Vrei să ștergi definitiv conversația “{conversationToDelete.title}”?
-            </p>
+            <p className="text-center text-gray-600 mt-2">Vrei să ștergi definitiv conversația “{conversationToDelete.title}”?</p>
             <div className="flex justify-center gap-4 mt-6">
-              <button onClick={() => setConversationToDelete(null)} className="px-6 py-2 rounded-lg border">
-                Anulează
-              </button>
-              <button onClick={handleDelete} className="px-6 py-2 rounded-lg bg-red-500 text-white">
-                Șterge
-              </button>
+              <button onClick={() => setConversationToDelete(null)} className="px-6 py-2 rounded-lg border">Anulează</button>
+              <button onClick={handleDelete} className="px-6 py-2 rounded-lg bg-red-500 text-white">Șterge</button>
             </div>
           </div>
         </div>
@@ -387,7 +519,7 @@ export default function ChatPage() {
   );
 }
 
-/* ---------------------- Item istoric ---------------------- */
+/* ===================== Item istoric ===================== */
 interface ConversationItemProps {
   convo: Conversation;
   isActive: boolean;
@@ -401,7 +533,7 @@ interface ConversationItemProps {
   setEditingTitle: (title: string) => void;
 }
 
-const ConversationItem = ({
+function ConversationItem({
   convo,
   isActive,
   isEditing,
@@ -411,7 +543,7 @@ const ConversationItem = ({
   onDelete,
   editingTitle,
   setEditingTitle,
-}: ConversationItemProps) => {
+}: ConversationItemProps) {
   const [optionsVisible, setOptionsVisible] = useState(false);
   const optionsRef = useRef<HTMLDivElement>(null);
 
@@ -434,7 +566,7 @@ const ConversationItem = ({
         isActive ? 'bg-primary/20 text-primary font-bold' : 'hover:bg-gray-200'
       }`}
     >
-            {isEditing ? (
+      {isEditing ? (
         <input
           type="text"
           value={editingTitle}
@@ -467,7 +599,6 @@ const ConversationItem = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   onStartEdit();
-                  setOptionsVisible(false);
                 }}
                 className="w-full text-left px-3 py-2 hover:bg-gray-100 flex items-center"
               >
@@ -477,7 +608,6 @@ const ConversationItem = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   onDelete();
-                  setOptionsVisible(false);
                 }}
                 className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-600 flex items-center"
               >
@@ -489,4 +619,4 @@ const ConversationItem = ({
       )}
     </div>
   );
-};
+}

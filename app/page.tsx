@@ -6,12 +6,13 @@ import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 import AuthModal from '@/components/AuthModal';
 
-
-// --- Componente Iconițe (SVG-uri pentru performanță) ---
+// --- Componente Iconițe ---
 const LockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>;
 const HeartIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 20.25l-7.682-7.682a4.5 4.5 0 010-6.364z" /></svg>;
 const BrainIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 8h6m-5 4h4m5 5H5a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v10a2 2 0 01-2 2z" /></svg>;
 const ClockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-accent-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>;
+
 
 // --- Componentele Paginilor ---
 
@@ -83,6 +84,64 @@ const SocialProofSection = () => (
     </section>
 );
 
+const PricingSection = () => (
+    <section className="py-20 bg-white px-4">
+        <div className="container mx-auto">
+            <div className="text-center max-w-2xl mx-auto mb-12">
+                <h2 className="font-poppins font-extrabold text-4xl md:text-5xl text-text mb-4">Alege planul potrivit pentru tine</h2>
+                <p className="text-lg text-gray-600">Deblochează tot potențialul conversațiilor cu un plan Premium.</p>
+            </div>
+            
+            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                {/* Plan Gratuit */}
+                <div className="border border-gray-200 rounded-xl p-8 flex flex-col">
+                    <h3 className="font-poppins font-bold text-2xl text-text mb-2">Gratuit</h3>
+                    <p className="text-gray-600 mb-6 h-12">Pentru a testa conversațiile</p>
+                    <p className="font-poppins font-extrabold text-5xl text-text mb-6">0<span className="text-lg font-bold"> RON</span></p>
+                    <ul className="space-y-4 mb-8 text-gray-700">
+                        <li className="flex items-center gap-3"><CheckIcon /> 5 conversații lunare</li>
+                    </ul>
+                    <div className="mt-auto">
+                        <Link href="/chat" className="w-full block text-center bg-gray-200 text-text font-bold px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors">Continuă gratuit</Link>
+                    </div>
+                </div>
+
+                {/* Plan Anual (Recomandat) */}
+                <div className="border-2 border-primary rounded-xl p-8 flex flex-col relative shadow-2xl">
+                    <span className="absolute top-0 -translate-y-1/2 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full self-center">RECOMANDAT</span>
+                    <h3 className="font-poppins font-bold text-2xl text-primary mb-2">Premium Anual</h3>
+                    <p className="text-gray-600 mb-6 h-12">Cea mai bună ofertă, economisești 2 luni</p>
+                    <p className="font-poppins font-extrabold text-5xl text-text mb-2">349<span className="text-lg font-bold"> RON</span></p>
+                    <p className="text-gray-500 mb-6">/ an</p>
+                    <ul className="space-y-4 mb-8 text-gray-700">
+                        <li className="flex items-center gap-3"><CheckIcon /> Conversații nelimitate</li>
+                        <li className="flex items-center gap-3"><CheckIcon /> Istoric complet salvat</li>
+                        <li className="flex items-center gap-3"><CheckIcon /> Acces la viitoare funcționalități</li>
+                    </ul>
+                    <div className="mt-auto">
+                        <button className="w-full bg-primary text-white font-bold px-6 py-3 rounded-lg hover:bg-opacity-90 transition-colors">Alege Premium Anual</button>
+                    </div>
+                </div>
+
+                {/* Plan Lunar */}
+                <div className="border border-gray-200 rounded-xl p-8 flex flex-col">
+                    <h3 className="font-poppins font-bold text-2xl text-text mb-2">Premium Lunar</h3>
+                    <p className="text-gray-600 mb-6 h-12">Flexibilitate maximă</p>
+                    <p className="font-poppins font-extrabold text-5xl text-text mb-2">35<span className="text-lg font-bold"> RON</span></p>
+                    <p className="text-gray-500 mb-6">/ lună</p>
+                    <ul className="space-y-4 mb-8 text-gray-700">
+                        <li className="flex items-center gap-3"><CheckIcon /> Conversații nelimitate</li>
+                        <li className="flex items-center gap-3"><CheckIcon /> Istoric complet salvat</li>
+                    </ul>
+                    <div className="mt-auto">
+                        <button className="w-full bg-gray-800 text-white font-bold px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors">Alege Premium Lunar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+);
+
 const Footer = () => (
   <footer className="py-10 px-4 text-center text-gray-500 text-sm border-t bg-white">
     <div className="container mx-auto">
@@ -108,6 +167,7 @@ export default function HomePage() {
         <HeroSection />
         <BenefitsSection />
         <SocialProofSection />
+        <PricingSection />
       </main>
       <Footer />
     </div>
