@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import Header from '@/components/Header'; // Importăm noul header
+import Header from '@/components/Header'; 
 import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 import AuthModal from '@/components/AuthModal';
+
 
 // --- Componente Iconițe (SVG-uri pentru performanță) ---
 const LockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>;
@@ -15,34 +16,34 @@ const ClockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w
 // --- Componentele Paginilor ---
 
 const HeroSection = () => {
-  const { user } = useAuth();
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const { user } = useAuth();
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  
+    const handleStartConversationClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+      if (!user) {
+        e.preventDefault();
+        setIsAuthModalOpen(true);
+      }
+    };
 
-  const handleStartConversationClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!user) {
-      e.preventDefault();
-      setIsAuthModalOpen(true);
-    }
-  };
-
-  return (
-    <>
-      <section className="text-center py-20 px-4">
-        <div className="container mx-auto max-w-3xl">
-          <h2 className="font-poppins font-extrabold text-4xl md:text-6xl text-text leading-tight mb-4">
-            Psiholog AI în limba română – <span className="text-primary">Ascultă, Înțelege, Ghidează</span>
-          </h2>
-          <p className="text-lg md:text-xl text-gray-600 mb-8">
-            Discret. 24/7. Gata să te ajute când nu ai cu cine vorbi.
-          </p>
-          <Link href="/chat" onClick={handleStartConversationClick} className="bg-primary text-white font-bold px-8 py-4 rounded-lg shadow-lg hover:bg-opacity-90 transition-all transform hover:scale-105 inline-block">
-            Începe conversația gratuit
-          </Link>
-        </div>
-      </section>
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
-    </>
-  );
+    return (
+        <>
+        <section className="text-center py-20 px-4">
+            <div className="container mx-auto max-w-3xl">
+            <h2 className="font-poppins font-extrabold text-4xl md:text-6xl text-text leading-tight mb-4">
+                Psiholog AI în limba română – <span className="text-primary">Ascultă, Înțelege, Ghidează</span>
+            </h2>
+            <p className="text-lg md:text-xl text-gray-600 mb-8">
+                Discret. 24/7. Gata să te ajute când nu ai cu cine vorbi.
+            </p>
+            <Link href="/chat" onClick={handleStartConversationClick} className="bg-primary text-white font-bold px-8 py-4 rounded-lg shadow-lg hover:bg-opacity-90 transition-all transform hover:scale-105 inline-block">
+                Începe conversația gratuit
+            </Link>
+            </div>
+        </section>
+        <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+        </>
+    );
 };
 
 const BenefitsSection = () => {
@@ -56,7 +57,7 @@ const BenefitsSection = () => {
   return (
     <section className="py-20 bg-white px-4">
       <div className="container mx-auto">
-        <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {benefits.map((benefit, index) => (
             <div key={index} className="text-center p-8 bg-background rounded-xl border border-gray-200">
               <div className="flex justify-center mb-5">{benefit.icon}</div>
@@ -73,8 +74,8 @@ const BenefitsSection = () => {
 const SocialProofSection = () => (
     <section className="py-20 bg-background px-4">
         <div className="container mx-auto text-center max-w-2xl p-8 bg-white rounded-xl border border-gray-200">
-            <h3 className="font-poppins font-bold text-3xl text-text mb-4">Mii de conversații au început deja</h3>
-            <p className="text-gray-600 text-lg italic">
+            <h3 className="font-poppins font-bold text-2xl md:text-3xl text-text mb-4">Mii de conversații au început deja</h3>
+            <p className="text-gray-600 text-base md:text-lg italic">
                 “Am fost surprins de cât de naturală a fost conversația. Chiar m-a ajutat să-mi pun ordine în gânduri într-un moment dificil.”
             </p>
             <p className="mt-4 text-gray-500">– Un utilizator anonim</p>

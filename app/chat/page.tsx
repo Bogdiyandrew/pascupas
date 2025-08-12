@@ -67,6 +67,11 @@ const DeleteIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
   </svg>
 );
+const MenuIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+    </svg>
+);
 
 /* ---------------------- Sugestii de start ---------------------- */
 const startSuggestions = [
@@ -90,6 +95,8 @@ export default function ChatPage() {
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [conversationToDelete, setConversationToDelete] = useState<Conversation | null>(null);
+  
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Stare pentru meniul mobil
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -129,6 +136,7 @@ export default function ChatPage() {
   const startNewConversation = () => {
     setActiveConversationId(null);
     setMessages([{ role: 'assistant', content: 'Salut! Sunt gata să te ascult. Cu ce-ți pot fi de ajutor?' }]);
+    if (window.innerWidth < 768) setIsSidebarOpen(false); // Închide meniul pe mobil
   };
 
   const selectConversation = async (id: string) => {
@@ -139,6 +147,7 @@ export default function ChatPage() {
     if (snap.exists()) {
       setMessages(snap.data().messages);
     }
+    if (window.innerWidth < 768) setIsSidebarOpen(false); // Închide meniul pe mobil
   };
 
   const handleRename = async (id: string, newTitle: string) => {
@@ -230,6 +239,7 @@ export default function ChatPage() {
     await sendMessage(text);
   };
 
+
   if (authLoading || !user) {
     return <div className="flex items-center justify-center h-screen">Se încarcă...</div>;
   }
@@ -237,9 +247,12 @@ export default function ChatPage() {
   return (
     <>
       <Header />
-      <div className="flex h-[calc(100vh-88px)]">
+      <div className="flex h-[calc(100vh-88px)] relative overflow-hidden">
+        {/* Overlay pentru meniul mobil */}
+        {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-20 md:hidden"></div>}
+
         {/* Sidebar */}
-        <aside className="w-1/4 bg-background border-r border-gray-200 p-6 flex flex-col">
+        <aside className={`absolute top-0 left-0 h-full w-3/4 max-w-xs md:w-1/4 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out bg-background border-r border-gray-200 p-6 flex flex-col z-30`}>
           <button
             onClick={startNewConversation}
             className="flex items-center justify-center gap-2 w-full bg-primary text-white font-bold p-3 rounded-lg hover:bg-opacity-90 transition-colors mb-8"
@@ -275,15 +288,21 @@ export default function ChatPage() {
         </aside>
 
         {/* Chat */}
-        <main className="w-3/4 flex flex-col bg-white">
-          <div ref={chatContainerRef} className="flex-grow p-6 space-y-4 overflow-y-auto">
+        <main className="w-full md:w-3/4 flex flex-col bg-white">
+          <div className="p-4 border-b md:hidden flex items-center">
+              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2">
+                  <MenuIcon />
+              </button>
+              <h2 className="font-bold text-lg">Chat</h2>
+          </div>
+          <div ref={chatContainerRef} className="flex-grow p-4 md:p-6 space-y-4 overflow-y-auto">
             {messages.map((msg, index) => (
               <div
                 key={index}
                 className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-xl p-4 rounded-2xl prose prose-sm ${
+                  className={`max-w-lg md:max-w-xl p-3 md:p-4 rounded-2xl prose prose-sm ${
                     msg.role === 'user'
                       ? 'bg-primary text-white rounded-br-none prose-invert'
                       : 'bg-gray-200 text-text rounded-bl-none'
@@ -318,19 +337,19 @@ export default function ChatPage() {
             )}
           </div>
 
-          <div className="p-6 bg-white border-t">
-            <form id="chatForm" onSubmit={handleSubmit} className="flex items-center space-x-4">
+          <div className="p-4 md:p-6 bg-white border-t">
+            <form id="chatForm" onSubmit={handleSubmit} className="flex items-center space-x-2 md:space-x-4">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Scrie mesajul tău aici..."
-                className="w-full p-4 border rounded-full bg-white text-black placeholder-gray-500 focus:ring-2 focus:ring-primary transition-shadow"
+                className="w-full p-3 md:p-4 border rounded-full bg-white text-black placeholder-gray-500 focus:ring-2 focus:ring-primary transition-shadow"
                 disabled={isLoading}
               />
               <button
                 type="submit"
-                className="bg-primary p-4 rounded-full text-white hover:bg-opacity-90 transition-colors disabled:bg-gray-400"
+                className="bg-primary p-3 md:p-4 rounded-full text-white hover:bg-opacity-90 transition-colors disabled:bg-gray-400"
                 disabled={isLoading || !input.trim()}
                 aria-label="Trimite mesaj"
               >
@@ -345,7 +364,7 @@ export default function ChatPage() {
       {/* Modal ștergere */}
       {conversationToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm">
+          <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm mx-4">
             <h3 className="font-bold text-lg text-center">Ești sigur?</h3>
             <p className="text-center text-gray-600 mt-2">
               Vrei să ștergi definitiv conversația “{conversationToDelete.title}”?
