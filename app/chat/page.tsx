@@ -13,7 +13,9 @@ import {
   getDocs, 
   orderBy, 
   Timestamp,
-  getDoc
+  getDoc,
+  deleteDoc,
+  updateDoc
 } from 'firebase/firestore';
 import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
@@ -34,17 +36,23 @@ interface Conversation {
 const SendIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>;
 const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>;
 const HistoryIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const OptionsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>;
+const EditIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>;
+const DeleteIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
 
 
 export default function ChatPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Salut! Sunt gata să te ascult. Cu ce-ți pot fi de ajutor?' }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([{ role: 'assistant', content: 'Salut! Sunt gata să te ascult. Cu ce-ți pot fi de ajutor?' }]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  
+  const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+
+  const [conversationToDelete, setConversationToDelete] = useState<Conversation | null>(null);
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -53,7 +61,6 @@ export default function ChatPage() {
 
   // --- Efecte (Hooks) ---
 
-  // Protejarea paginii și încărcarea conversațiilor
   useEffect(() => {
     if (!authLoading) {
       if (!user) {
@@ -64,7 +71,6 @@ export default function ChatPage() {
     }
   }, [user, authLoading, router]);
 
-  // Scroll automat la ultimul mesaj
   useEffect(() => {
     chatContainerRef.current?.scrollTo(0, chatContainerRef.current.scrollHeight);
   }, [messages]);
@@ -89,12 +95,31 @@ export default function ChatPage() {
   };
 
   const selectConversation = async (id: string) => {
+    if (editingConversationId === id) return;
     setActiveConversationId(id);
     const docRef = doc(db, "conversations", id);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       setMessages(docSnap.data().messages);
     }
+  };
+
+  const handleRename = async (id: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    const docRef = doc(db, "conversations", id);
+    await updateDoc(docRef, { title: newTitle });
+    setConversations(convos => convos.map(c => c.id === id ? { ...c, title: newTitle } : c));
+    setEditingConversationId(null);
+  };
+  
+  const handleDelete = async () => {
+    if (!conversationToDelete) return;
+    await deleteDoc(doc(db, "conversations", conversationToDelete.id));
+    setConversations(convos => convos.filter(c => c.id !== conversationToDelete.id));
+    if (activeConversationId === conversationToDelete.id) {
+      startNewConversation();
+    }
+    setConversationToDelete(null);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -122,25 +147,22 @@ export default function ChatPage() {
       const finalMessages = [...newMessages, aiMessage];
       setMessages(finalMessages);
 
-      // --- Logica de Salvare în Firestore ---
       if (activeConversationId) {
-        // Actualizează conversația existentă
         const docRef = doc(db, "conversations", activeConversationId);
         await setDoc(docRef, { messages: finalMessages }, { merge: true });
       } else {
-        // Creează o conversație nouă
+        const newTitle = userMessage.content.substring(0, 40) + '...';
         const newConversationData = {
           userId: user.uid,
-          title: userMessage.content.substring(0, 40) + '...',
+          title: newTitle,
           messages: finalMessages,
           createdAt: Timestamp.now()
         };
         const docRef = await addDoc(collection(db, "conversations"), newConversationData);
         
-        // **CORECTAT**: Actualizăm starea locală pentru un UI instantaneu
         const newConversationForState: Conversation = {
           id: docRef.id,
-          title: newConversationData.title,
+          title: newTitle,
           createdAt: newConversationData.createdAt
         };
         setConversations(prevConvos => [newConversationForState, ...prevConvos]);
@@ -170,17 +192,23 @@ export default function ChatPage() {
             Conversație Nouă
           </button>
           
-          <div className="flex-grow overflow-y-auto">
+          <div className="flex-grow overflow-y-auto pr-2">
             <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2"><HistoryIcon /> Istoric</h2>
             <div className="space-y-2">
               {conversations.map(convo => (
-                <p 
-                  key={convo.id} 
-                  onClick={() => selectConversation(convo.id)}
-                  className={`p-2 rounded-lg cursor-pointer text-sm truncate ${activeConversationId === convo.id ? 'bg-primary/20 text-primary font-bold' : 'hover:bg-gray-200'}`}
-                >
-                  {convo.title}
-                </p>
+                <ConversationItem 
+                  key={convo.id}
+                  convo={convo}
+                  isActive={activeConversationId === convo.id}
+                  isEditing={editingConversationId === convo.id}
+                  onSelect={() => selectConversation(convo.id)}
+                  onStartEdit={() => { setEditingConversationId(convo.id); setEditingTitle(convo.title); }}
+                  onCancelEdit={() => setEditingConversationId(null)}
+                  onSaveEdit={(newTitle) => handleRename(convo.id, newTitle)}
+                  onDelete={() => setConversationToDelete(convo)}
+                  editingTitle={editingTitle}
+                  setEditingTitle={setEditingTitle}
+                />
               ))}
             </div>
           </div>
@@ -188,6 +216,7 @@ export default function ChatPage() {
 
         {/* --- Zona Principală de Chat --- */}
         <main className="w-3/4 flex flex-col bg-white">
+          {/* ... conținutul chat-ului rămâne la fel ... */}
           <div ref={chatContainerRef} className="flex-grow p-6 space-y-4 overflow-y-auto">
             {messages.map((msg, index) => (
               <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -223,6 +252,89 @@ export default function ChatPage() {
           </div>
         </main>
       </div>
+      
+      {/* --- Modal de Confirmare Ștergere --- */}
+      {conversationToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 className="font-bold text-lg text-center">Ești sigur?</h3>
+            <p className="text-center text-gray-600 mt-2">Vrei să ștergi definitiv conversația "{conversationToDelete.title}"?</p>
+            <div className="flex justify-center gap-4 mt-6">
+              <button onClick={() => setConversationToDelete(null)} className="px-6 py-2 rounded-lg border">Anulează</button>
+              <button onClick={handleDelete} className="px-6 py-2 rounded-lg bg-red-500 text-white">Șterge</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
+
+// --- Tipuri pentru proprietățile componentei ConversationItem ---
+interface ConversationItemProps {
+  convo: Conversation;
+  isActive: boolean;
+  isEditing: boolean;
+  onSelect: () => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: (newTitle: string) => void;
+  onDelete: () => void;
+  editingTitle: string;
+  setEditingTitle: (title: string) => void;
+}
+
+// --- Componentă separată pentru un item din istoric ---
+const ConversationItem = ({ convo, isActive, isEditing, onSelect, onStartEdit, onSaveEdit, onDelete, editingTitle, setEditingTitle }: ConversationItemProps) => {
+  const [optionsVisible, setOptionsVisible] = useState(false);
+  const optionsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (optionsRef.current && !optionsRef.current.contains(event.target as Node)) {
+        setOptionsVisible(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleTitleSave = () => {
+    onSaveEdit(editingTitle);
+  };
+
+  return (
+    <div 
+      onClick={onSelect}
+      className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer text-sm ${isActive ? 'bg-primary/20 text-primary font-bold' : 'hover:bg-gray-200'}`}
+    >
+      {isEditing ? (
+        <input
+          type="text"
+          value={editingTitle}
+          onChange={(e) => setEditingTitle(e.target.value)}
+          onBlur={handleTitleSave}
+          onKeyDown={(e) => e.key === 'Enter' && handleTitleSave()}
+          className="w-full bg-transparent outline-none ring-1 ring-primary rounded px-1"
+          autoFocus
+        />
+      ) : (
+        <p className="truncate">{convo.title}</p>
+      )}
+      
+      {!isEditing && (
+        <div className="relative" ref={optionsRef}>
+          <button onClick={(e) => { e.stopPropagation(); setOptionsVisible(!optionsVisible); }} className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-gray-300">
+            <OptionsIcon />
+          </button>
+          {optionsVisible && (
+            <div className="absolute right-0 top-full mt-1 w-40 bg-white border rounded-lg shadow-lg z-10">
+              <button onClick={(e) => { e.stopPropagation(); onStartEdit(); setOptionsVisible(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 flex items-center"><EditIcon /> Redenumește</button>
+              <button onClick={(e) => { e.stopPropagation(); onDelete(); setOptionsVisible(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-600 flex items-center"><DeleteIcon /> Șterge</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
