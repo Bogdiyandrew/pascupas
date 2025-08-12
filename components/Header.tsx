@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { getAuth, signOut } from 'firebase/auth';
 import { useAuth } from '@/context/AuthContext'; // Importăm hook-ul nostru
 import AuthModal from './AuthModal'; // Importăm modalul funcțional
+import { useRouter } from 'next/navigation';
 
 export default function Header() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const { user } = useAuth(); // Obținem utilizatorul curent din context
   const auth = getAuth();
+  const router = useRouter();
 
   const handleLogout = async () => {
     try {
@@ -17,6 +19,13 @@ export default function Header() {
       // Starea se va actualiza automat datorită listener-ului din AuthContext
     } catch (error) {
       console.error("Eroare la deconectare:", error);
+    }
+  };
+
+  const handleChatLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!user) {
+      e.preventDefault();
+      setIsAuthModalOpen(true);
     }
   };
 
@@ -30,7 +39,7 @@ export default function Header() {
           <nav className="flex items-center space-x-4">
             {user ? ( // Verificăm dacă există un utilizator
               <>
-                <Link href="/chat" className="font-bold text-text hover:text-primary transition-colors">Conversații</Link>
+                <Link href="/chat" onClick={handleChatLinkClick} className="font-bold text-text hover:text-primary transition-colors">Conversații</Link>
                 <button onClick={handleLogout} className="bg-primary text-white px-5 py-2 rounded-lg font-bold hover:bg-opacity-90 transition-colors">Deconectare</button>
               </>
             ) : (

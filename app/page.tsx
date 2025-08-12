@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import Header from '@/components/Header'; // Importăm noul header
+import { useAuth } from '@/context/AuthContext';
+import { useState } from 'react';
+import AuthModal from '@/components/AuthModal';
 
 // --- Componente Iconițe (SVG-uri pentru performanță) ---
 const LockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>;
@@ -11,21 +14,36 @@ const ClockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w
 
 // --- Componentele Paginilor ---
 
-const HeroSection = () => (
-  <section className="text-center py-20 px-4">
-    <div className="container mx-auto max-w-3xl">
-      <h2 className="font-poppins font-extrabold text-4xl md:text-6xl text-text leading-tight mb-4">
-        Psiholog AI în limba română – <span className="text-primary">Ascultă, Înțelege, Ghidează</span>
-      </h2>
-      <p className="text-lg md:text-xl text-gray-600 mb-8">
-        Discret. 24/7. Gata să te ajute când nu ai cu cine vorbi.
-      </p>
-      <Link href="/chat" className="bg-primary text-white font-bold px-8 py-4 rounded-lg shadow-lg hover:bg-opacity-90 transition-all transform hover:scale-105 inline-block">
-        Începe conversația gratuit
-      </Link>
-    </div>
-  </section>
-);
+const HeroSection = () => {
+  const { user } = useAuth();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const handleStartConversationClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!user) {
+      e.preventDefault();
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  return (
+    <>
+      <section className="text-center py-20 px-4">
+        <div className="container mx-auto max-w-3xl">
+          <h2 className="font-poppins font-extrabold text-4xl md:text-6xl text-text leading-tight mb-4">
+            Psiholog AI în limba română – <span className="text-primary">Ascultă, Înțelege, Ghidează</span>
+          </h2>
+          <p className="text-lg md:text-xl text-gray-600 mb-8">
+            Discret. 24/7. Gata să te ajute când nu ai cu cine vorbi.
+          </p>
+          <Link href="/chat" onClick={handleStartConversationClick} className="bg-primary text-white font-bold px-8 py-4 rounded-lg shadow-lg hover:bg-opacity-90 transition-all transform hover:scale-105 inline-block">
+            Începe conversația gratuit
+          </Link>
+        </div>
+      </section>
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+    </>
+  );
+};
 
 const BenefitsSection = () => {
   const benefits = [
