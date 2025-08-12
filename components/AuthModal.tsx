@@ -7,6 +7,7 @@ import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup
+  // Am eliminat 'FirebaseError' care nu este exportat
 } from 'firebase/auth';
 import { app } from '@/lib/firebase';
 
@@ -37,8 +38,13 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
         await createUserWithEmailAndPassword(auth, email, password);
       }
       onClose(); // Închide modalul după succes
-    } catch (err: any) {
-      setError(getFirebaseErrorMessage(err.code));
+    } catch (err: unknown) { 
+      // CORECTAT: Verificăm dacă eroarea are o proprietate 'code'
+      if (typeof err === 'object' && err !== null && 'code' in err) {
+        setError(getFirebaseErrorMessage((err as { code: string }).code));
+      } else {
+        setError('A apărut o eroare necunoscută.');
+      }
     }
   };
   
@@ -47,8 +53,13 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
     try {
         await signInWithPopup(auth, googleProvider);
         onClose();
-    } catch (err: any) {
-        setError(getFirebaseErrorMessage(err.code));
+    } catch (err: unknown) {
+        // CORECTAT: Verificăm dacă eroarea are o proprietate 'code'
+        if (typeof err === 'object' && err !== null && 'code' in err) {
+            setError(getFirebaseErrorMessage((err as { code: string }).code));
+        } else {
+            setError('A apărut o eroare la conectarea cu Google.');
+        }
     }
   };
 
