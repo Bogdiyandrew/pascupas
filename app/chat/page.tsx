@@ -19,20 +19,20 @@ import {
 } from 'firebase/firestore';
 import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
+import ReactMarkdown from 'react-markdown';
 
-// --- Tipuri ---
+/* ---------------------- Tipuri ---------------------- */
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
-
 interface Conversation {
   id: string;
   title: string;
   createdAt: Timestamp;
 }
 
-// --- Iconițe ---
+/* ---------------------- Iconițe simple ---------------------- */
 const SendIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
     <path
@@ -68,6 +68,15 @@ const DeleteIcon = () => (
   </svg>
 );
 
+/* ---------------------- Sugestii de start ---------------------- */
+const startSuggestions = [
+  'Vreau să vorbesc despre stres',
+  'Mă simt trist/ă',
+  'Am nevoie de un sfat',
+  'Nu pot dormi bine',
+  'Mă simt anxios/anxioasă',
+];
+
 export default function ChatPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -80,15 +89,15 @@ export default function ChatPage() {
 
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
-
   const [conversationToDelete, setConversationToDelete] = useState<Conversation | null>(null);
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // --- DB: load conversations
+  /* ---------------------- Load istoric ---------------------- */
   const fetchConversations = useCallback(async () => {
     if (!user) return;
     const q = query(
@@ -116,6 +125,7 @@ export default function ChatPage() {
     chatContainerRef.current?.scrollTo(0, chatContainerRef.current.scrollHeight);
   }, [messages]);
 
+  /* ---------------------- Acțiuni conversații ---------------------- */
   const startNewConversation = () => {
     setActiveConversationId(null);
     setMessages([{ role: 'assistant', content: 'Salut! Sunt gata să te ascult. Cu ce-ți pot fi de ajutor?' }]);
@@ -143,23 +153,18 @@ export default function ChatPage() {
     if (!conversationToDelete) return;
     await deleteDoc(doc(db, 'conversations', conversationToDelete.id));
     setConversations((convos) => convos.filter((c) => c.id !== conversationToDelete.id));
-    if (activeConversationId === conversationToDelete.id) {
-      startNewConversation();
-    }
+    if (activeConversationId === conversationToDelete.id) startNewConversation();
     setConversationToDelete(null);
   };
 
-  // -------------------------------
-  //       STREAMING HANDLER
-  // -------------------------------
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading || !user) return;
+  /* ---------------------- Streaming helper ---------------------- */
+  async function sendMessage(text: string) {
+    if (!text.trim() || isLoading || !user) return;
 
-    const userMessage: Message = { role: 'user', content: input };
+    const userMessage: Message = { role: 'user', content: text };
     const baseMessages = [...messages, userMessage];
 
-    // punem imediat mesajul user și un placeholder pentru AI
+    // afișăm instant mesajul utilizatorului + placeholder pentru AI
     setMessages([...baseMessages, { role: 'assistant', content: '' }]);
     setInput('');
     setIsLoading(true);
@@ -178,7 +183,6 @@ export default function ChatPage() {
       const decoder = new TextDecoder();
       let aiText = '';
 
-      // citim chunk-urile și actualizăm în timp real ultimul mesaj (assistant)
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -186,7 +190,6 @@ export default function ChatPage() {
 
         setMessages((prev) => {
           const copy = [...prev];
-          // ultimul mesaj e asistentul placeholder
           copy[copy.length - 1] = { role: 'assistant', content: aiText };
           return copy;
         });
@@ -194,25 +197,20 @@ export default function ChatPage() {
 
       const finalMessages = [...baseMessages, { role: 'assistant', content: aiText }];
 
-      // persistă conversația în DB
+      // persist conversația
       if (activeConversationId) {
         const docRef = doc(db, 'conversations', activeConversationId);
         await setDoc(docRef, { messages: finalMessages }, { merge: true });
       } else {
         const newTitle = userMessage.content.substring(0, 40) + (userMessage.content.length > 40 ? '…' : '');
-        const newConversationData = {
+        const data = {
           userId: user.uid,
           title: newTitle,
           messages: finalMessages,
           createdAt: Timestamp.now(),
         };
-        const docRef = await addDoc(collection(db, 'conversations'), newConversationData);
-        const newConversationForState: Conversation = {
-          id: docRef.id,
-          title: newTitle,
-          createdAt: newConversationData.createdAt,
-        };
-        setConversations((prevConvos) => [newConversationForState, ...prevConvos]);
+        const docRef = await addDoc(collection(db, 'conversations'), data);
+        setConversations((prev) => [{ id: docRef.id, title: newTitle, createdAt: data.createdAt }, ...prev]);
         setActiveConversationId(docRef.id);
       }
     } catch (err: unknown) {
@@ -220,6 +218,16 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  /* ---------------------- Handlere UI ---------------------- */
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    await sendMessage(input);
+  };
+
+  const handleSuggestionClick = async (text: string) => {
+    await sendMessage(text);
   };
 
   if (authLoading || !user) {
@@ -239,7 +247,6 @@ export default function ChatPage() {
             <PlusIcon />
             Conversație Nouă
           </button>
-
           <div className="flex-grow overflow-y-auto pr-2">
             <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
               <HistoryIcon /> Istoric
@@ -276,16 +283,32 @@ export default function ChatPage() {
                 className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-xl p-4 rounded-2xl ${
+                  className={`max-w-xl p-4 rounded-2xl prose prose-sm max-w-none ${
                     msg.role === 'user'
-                      ? 'bg-primary text-white rounded-br-none'
+                      ? 'bg-primary text-white rounded-br-none prose-invert'
                       : 'bg-gray-200 text-text rounded-bl-none'
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
               </div>
             ))}
+
+            {/* SUGESTII DE START */}
+            {messages.length === 1 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {startSuggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSuggestionClick(s)}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-full text-sm text-gray-700 border"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-gray-200 text-text rounded-2xl p-4 rounded-bl-none">
@@ -296,7 +319,7 @@ export default function ChatPage() {
           </div>
 
           <div className="p-6 bg-white border-t">
-            <form onSubmit={handleSubmit} className="flex items-center space-x-4">
+            <form id="chatForm" onSubmit={handleSubmit} className="flex items-center space-x-4">
               <input
                 type="text"
                 value={input}
@@ -309,6 +332,7 @@ export default function ChatPage() {
                 type="submit"
                 className="bg-primary p-4 rounded-full text-white hover:bg-opacity-90 transition-colors disabled:bg-gray-400"
                 disabled={isLoading || !input.trim()}
+                aria-label="Trimite mesaj"
               >
                 <SendIcon />
               </button>
@@ -341,7 +365,7 @@ export default function ChatPage() {
   );
 }
 
-// --- Item istoric ---
+/* ---------------------- Item istoric ---------------------- */
 interface ConversationItemProps {
   convo: Conversation;
   isActive: boolean;
@@ -388,7 +412,7 @@ const ConversationItem = ({
         isActive ? 'bg-primary/20 text-primary font-bold' : 'hover:bg-gray-200'
       }`}
     >
-      {isEditing ? (
+            {isEditing ? (
         <input
           type="text"
           value={editingTitle}
@@ -410,9 +434,11 @@ const ConversationItem = ({
               setOptionsVisible(!optionsVisible);
             }}
             className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-gray-300"
+            aria-label="Opțiuni conversație"
           >
             <OptionsIcon />
           </button>
+
           {optionsVisible && (
             <div className="absolute right-0 top-full mt-1 w-40 bg-white border rounded-lg shadow-lg z-10">
               <button
