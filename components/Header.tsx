@@ -2,39 +2,22 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-// Vom crea acest modal în pasul următor
-// import AuthModal from './AuthModal'; 
-
-// --- Componente Iconițe ---
-const CloseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
-
-
-// --- Componenta Modală Placeholder ---
-// O vom dezvolta complet mai târziu
-const AuthModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
-          <CloseIcon />
-        </button>
-        <h2 className="font-poppins font-bold text-2xl text-center mb-6 text-text">Bun venit!</h2>
-        <p className="text-center text-gray-600">Formularul de autentificare va apărea aici.</p>
-      </div>
-    </div>
-  );
-};
-
+import { getAuth, signOut } from 'firebase/auth';
+import { useAuth } from '@/context/AuthContext'; // Importăm hook-ul nostru
+import AuthModal from './AuthModal'; // Importăm modalul funcțional
 
 export default function Header() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  // Simulare stare logare - vom înlocui cu Firebase Auth
-  const [isLoggedIn, setIsLoggedIn] = useState(false); 
+  const { user } = useAuth(); // Obținem utilizatorul curent din context
+  const auth = getAuth();
 
-  const handleLogout = () => {
-    // Aici va veni logica de logout din Firebase
-    setIsLoggedIn(false);
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      // Starea se va actualiza automat datorită listener-ului din AuthContext
+    } catch (error) {
+      console.error("Eroare la deconectare:", error);
+    }
   };
 
   return (
@@ -45,7 +28,7 @@ export default function Header() {
             PascuPas<span className="text-primary">.online</span>
           </Link>
           <nav className="flex items-center space-x-4">
-            {isLoggedIn ? (
+            {user ? ( // Verificăm dacă există un utilizator
               <>
                 <Link href="/chat" className="font-bold text-text hover:text-primary transition-colors">Conversații</Link>
                 <button onClick={handleLogout} className="bg-primary text-white px-5 py-2 rounded-lg font-bold hover:bg-opacity-90 transition-colors">Deconectare</button>
