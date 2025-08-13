@@ -19,7 +19,7 @@ import {
 import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
 import ReactMarkdown from 'react-markdown';
-import { encryptText, decryptText } from '@/lib/cryptoChat';
+import { encryptText, decryptText, isChatCryptoReady } from '@/lib/cryptoChat';
 
 /* ===================== Tipuri ===================== */
 interface Message {
@@ -72,7 +72,7 @@ function ConsentModal({ onAccept, onDecline, noStore, setNoStore }: { onAccept: 
 }
 
 export default function ChatPage() {
-    const { user, loading: authLoading } = useAuth();
+    const { user, loading: authLoading, cryptoReady } = useAuth();
     const router = useRouter();
     const [hasConsented, setHasConsented] = useState(false);
     const [noStore, setNoStore] = useState(false);
@@ -192,6 +192,12 @@ export default function ChatPage() {
             return;
         }
 
+        // Verifică dacă criptarea este disponibilă
+        if (!noStore && !cryptoReady) {
+            setError('Criptarea nu este încă disponibilă. Te rog să aștepți sau să te re-loghezi.');
+            return;
+        }
+
         const userMessage: Message = { role: 'user', content: text };
         const currentDisplayMessages = [...messages, userMessage];
 
@@ -229,15 +235,22 @@ export default function ChatPage() {
 
             const finalAssistantMessage: Message = { role: 'assistant', content: aiText };
             
-            if (!noStore) {
-                // Criptare și stocare
+            if (!noStore && cryptoReady) {
+                // Verifică din nou dacă criptarea este disponibilă
+                if (!isChatCryptoReady()) {
+                    setError('Criptarea nu mai este disponibilă. Te rog să te re-loghezi.');
+                    setIsLoading(false);
+                    return;
+                }
+
+                // Criptare cu implementarea securizată
                 const userEncryption = await encryptText(userMessage.content);
                 const assistantEncryption = await encryptText(finalAssistantMessage.content);
                 
                 // Verifică că criptarea a funcționat
                 if (!userEncryption?.ciphertext || !userEncryption?.iv || 
                     !assistantEncryption?.ciphertext || !assistantEncryption?.iv) {
-                    setError('Eroare la criptare. Încearcă din nou.');
+                    setError('Eroare la criptarea mesajelor. Verifică dacă ești conectat și încearcă din nou.');
                     setIsLoading(false);
                     return;
                 }
@@ -310,7 +323,11 @@ export default function ChatPage() {
                             updatedAt: new Date()
                         };
                         await updateDoc(docRef, updateData);
-                    } else {
+                    } else if (!noStore && !cryptoReady) {
+                setError('Criptarea nu este disponibilă. Încearcă să te re-loghezi.');
+                setIsLoading(false);
+                return;
+            } else {
                         const newTitle = userMessage.content.substring(0, 40) + (userMessage.content.length > 40 ? '…' : '');
                         const now = new Date();
                         const data = { 
@@ -350,6 +367,23 @@ export default function ChatPage() {
 
     if (authLoading || !user) { 
         return <div className="flex items-center justify-center h-screen">Se încarcă...</div>; 
+    }
+
+    if (!noStore && !cryptoReady) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-lg font-medium">Se inițializează criptarea securizată...</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                        Acest proces poate dura câteva secunde.
+                    </p>
+                    <p className="text-xs text-gray-400 mt-2">
+                        Dacă persistă, încearcă să te re-loghezi.
+                    </p>
+                </div>
+            </div>
+        );
     }
     
     if (!hasConsented) {

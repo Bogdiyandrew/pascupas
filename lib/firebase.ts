@@ -1,5 +1,8 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+
+
 
 // --- Configurare Firebase ---
 // Aceste variabile vin din fișierul .env.local
@@ -17,4 +20,5 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
+export const auth = getAuth(app);
 export { app, db };

@@ -18,8 +18,7 @@ export default function PoliticaConfidentialitate() {
 
       <h2 className="text-xl font-semibold mb-2">1. Cine suntem</h2>
       <p className="mb-4">
-        Platforma <strong>PascuPas.online</strong> este administrată de [Numele firmei / persoanei],
-        cu sediul în [Adresa completă]. Email de contact:{" "}
+        Platforma <strong>PascuPas.online</strong> este administrată de [CODE COMMERCE HUB S.R.L.]. Email de contact:{" "}
         <a href="mailto:contact@pascupas.online" className="text-blue-600 underline">
           contact@pascupas.online
         </a>.
