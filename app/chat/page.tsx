@@ -6,7 +6,6 @@ import { db } from '@/lib/firebase';
 import {
   collection,
   doc,
-  setDoc,
   query,
   where,
   getDocs,
@@ -16,7 +15,7 @@ import {
   deleteDoc,
   updateDoc,
   addDoc,
-  serverTimestamp, // <-- 1. IMPORTĂM serverTimestamp
+  serverTimestamp,
 } from 'firebase/firestore';
 import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
@@ -99,10 +98,14 @@ export default function ChatPage() {
 
     const fetchConversations = useCallback(async () => {
         if (!user || noStore) return;
-        const q = query(collection(db, 'conversations'), where('userId', '==', user.uid), orderBy('updatedAt', 'desc'));
-        const querySnapshot = await getDocs(q);
-        const convos = querySnapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Conversation, 'id'>) }));
-        setConversations(convos);
+        try {
+            const q = query(collection(db, 'conversations'), where('userId', '==', user.uid), orderBy('updatedAt', 'desc'));
+            const querySnapshot = await getDocs(q);
+            const convos = querySnapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Conversation, 'id'>) }));
+            setConversations(convos);
+        } catch (error) {
+            console.error('Error fetching conversations:', error);
+        }
     }, [user, noStore]);
 
     useEffect(() => {
@@ -128,45 +131,59 @@ export default function ChatPage() {
         if (noStore) return;
 
         setIsLoading(true);
-        const docRef = doc(db, 'conversations', id);
-        const snap = await getDoc(docRef);
+        try {
+            const docRef = doc(db, 'conversations', id);
+            const snap = await getDoc(docRef);
 
-        if (snap.exists()) {
-            const fetchedMessages = (snap.data().messages || []) as Message[];
-            const decryptedMessages = await Promise.all(
-                fetchedMessages.map(async (msg) => {
-                    if (msg.contentEnc && msg.iv) {
-                        try {
-                            const decryptedContent = await decryptText(msg.contentEnc, msg.iv);
-                            return { ...msg, content: decryptedContent };
-                        } catch (e) {
-                            console.error("Failed to decrypt a message:", e);
-                            return { ...msg, content: "[Mesaj indescifrabil]" };
+            if (snap.exists()) {
+                const fetchedMessages = (snap.data().messages || []) as Message[];
+                
+                const decryptedMessages = await Promise.all(
+                    fetchedMessages.map(async (msg) => {
+                        if (msg.contentEnc && msg.iv) {
+                            try {
+                                const decryptedContent = await decryptText(msg.contentEnc, msg.iv);
+                                return { ...msg, content: decryptedContent };
+                            } catch (e) {
+                                console.error("Failed to decrypt a message:", e);
+                                return { ...msg, content: "[Mesaj indescifrabil]" };
+                            }
                         }
-                    }
-                    return msg;
-                })
-            );
-            setMessages(decryptedMessages);
+                        return msg;
+                    })
+                );
+                setMessages(decryptedMessages);
+            }
+        } catch (error) {
+            console.error('Error selecting conversation:', error);
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
         if (window.innerWidth < 768) setIsSidebarOpen(false);
     };
 
     const handleRename = async (id: string, newTitle: string) => {
         if (!newTitle.trim() || noStore) return;
-        const docRef = doc(db, 'conversations', id);
-        await updateDoc(docRef, { title: newTitle });
-        setConversations((convos) => convos.map((c) => (c.id === id ? { ...c, title: newTitle } : c)));
-        setEditingConversationId(null);
+        try {
+            const docRef = doc(db, 'conversations', id);
+            await updateDoc(docRef, { title: newTitle });
+            setConversations((convos) => convos.map((c) => (c.id === id ? { ...c, title: newTitle } : c)));
+            setEditingConversationId(null);
+        } catch (error) {
+            console.error('Error renaming conversation:', error);
+        }
     };
 
     const handleDelete = async () => {
         if (!conversationToDelete || noStore) return;
-        await deleteDoc(doc(db, 'conversations', conversationToDelete.id));
-        setConversations((convos) => convos.filter((c) => c.id !== conversationToDelete.id));
-        if (activeConversationId === conversationToDelete.id) startNewConversation();
-        setConversationToDelete(null);
+        try {
+            await deleteDoc(doc(db, 'conversations', conversationToDelete.id));
+            setConversations((convos) => convos.filter((c) => c.id !== conversationToDelete.id));
+            if (activeConversationId === conversationToDelete.id) startNewConversation();
+            setConversationToDelete(null);
+        } catch (error) {
+            console.error('Error deleting conversation:', error);
+        }
     };
 
     async function sendMessage(text: string) {
@@ -214,45 +231,104 @@ export default function ChatPage() {
             const finalAssistantMessage: Message = { role: 'assistant', content: aiText };
             
             if (!noStore) {
-                const { ciphertext: userCiphertext, iv: userIv } = await encryptText(userMessage.content);
-                const { ciphertext: assistantCiphertext, iv: assistantIv } = await encryptText(finalAssistantMessage.content);
+                // Criptare și stocare
+                const userEncryption = await encryptText(userMessage.content);
+                const assistantEncryption = await encryptText(finalAssistantMessage.content);
+                
+                // Verifică că criptarea a funcționat
+                if (!userEncryption?.ciphertext || !userEncryption?.iv || 
+                    !assistantEncryption?.ciphertext || !assistantEncryption?.iv) {
+                    setError('Eroare la criptare. Încearcă din nou.');
+                    setIsLoading(false);
+                    return;
+                }
+
+                const { ciphertext: userCiphertext, iv: userIv } = userEncryption;
+                const { ciphertext: assistantCiphertext, iv: assistantIv } = assistantEncryption;
 
                 const finalUserMessageForState = { ...userMessage, contentEnc: userCiphertext, iv: userIv };
                 const finalAssistantMessageForState = { ...finalAssistantMessage, contentEnc: assistantCiphertext, iv: assistantIv };
 
                 setMessages([...messages, finalUserMessageForState, finalAssistantMessageForState]);
 
+                // Pregătire mesaje pentru stocare
                 const previousMessagesToStore = messages
-                    .filter(msg => msg.contentEnc && msg.iv)
-                    .map(msg => ({ role: msg.role, contentEnc: msg.contentEnc, iv: msg.iv }));
+                    .filter(msg => msg.contentEnc && msg.iv && msg.role)
+                    .map(msg => ({
+                        role: msg.role,
+                        contentEnc: msg.contentEnc!,
+                        iv: msg.iv!
+                    }))
+                    .filter(msg => 
+                        typeof msg.role === 'string' && 
+                        typeof msg.contentEnc === 'string' && 
+                        typeof msg.iv === 'string'
+                    );
+
+                // Creează obiecte curate cu EXACT 3 proprietăți
+                const userMessageToStore = {
+                    role: 'user' as const,
+                    contentEnc: userCiphertext,
+                    iv: userIv
+                };
                 
+                const assistantMessageToStore = {
+                    role: 'assistant' as const,
+                    contentEnc: assistantCiphertext,
+                    iv: assistantIv
+                };
+
                 const finalMessagesToStore = [
                     ...previousMessagesToStore,
-                    { role: 'user', contentEnc: userCiphertext, iv: userIv },
-                    { role: 'assistant', contentEnc: assistantCiphertext, iv: assistantIv },
+                    userMessageToStore,
+                    assistantMessageToStore,
                 ];
                 
-                if (activeConversationId) {
-                    const docRef = doc(db, 'conversations', activeConversationId);
-                    await updateDoc(docRef, { 
-                        messages: finalMessagesToStore, 
-                        updatedAt: serverTimestamp() 
-                    });
-                } else {
-                    const newTitle = userMessage.content.substring(0, 40) + (userMessage.content.length > 40 ? '…' : '');
-                    const data = { 
-                        userId: user.uid, 
-                        title: newTitle, 
-                        messages: finalMessagesToStore, 
-                        createdAt: serverTimestamp(), 
-                        updatedAt: serverTimestamp()
-                    };
-                    const docRef = await addDoc(collection(db, 'conversations'), data);
-                    setActiveConversationId(docRef.id);
+                // Validare finală în frontend
+                const allMessagesValid = finalMessagesToStore.every((msg) => {
+                    const hasCorrectKeys = Object.keys(msg).length === 3 && 
+                                         msg.role && msg.contentEnc && msg.iv;
+                    const hasCorrectTypes = typeof msg.role === 'string' && 
+                                          typeof msg.contentEnc === 'string' && 
+                                          typeof msg.iv === 'string';
+                    const hasValidRole = msg.role === 'user' || msg.role === 'assistant';
+                    const hasValidContent = msg.contentEnc.length > 0 && msg.iv.length > 0;
+                    
+                    return hasCorrectKeys && hasCorrectTypes && hasValidRole && hasValidContent;
+                });
+
+                if (!allMessagesValid) {
+                    setError('Eroare la validarea mesajelor. Încearcă din nou.');
+                    setIsLoading(false);
+                    return;
                 }
-                await fetchConversations();
+
+                try {
+                    if (activeConversationId) {
+                        const docRef = doc(db, 'conversations', activeConversationId);
+                        await updateDoc(docRef, { 
+                            messages: finalMessagesToStore, 
+                            updatedAt: serverTimestamp() 
+                        });
+                    } else {
+                        const newTitle = userMessage.content.substring(0, 40) + (userMessage.content.length > 40 ? '…' : '');
+                        const data = { 
+                            userId: user.uid, 
+                            title: newTitle, 
+                            messages: finalMessagesToStore, 
+                            createdAt: serverTimestamp(), 
+                            updatedAt: serverTimestamp()
+                        };
+                        const docRef = await addDoc(collection(db, 'conversations'), data);
+                        setActiveConversationId(docRef.id);
+                    }
+                    await fetchConversations();
+                } catch (firestoreError: any) {
+                    console.error('Firestore error:', firestoreError);
+                    setError(`Eroare la salvare: ${firestoreError.message || 'Eroare necunoscută'}`);
+                }
             } else {
-                 setMessages([...messages, userMessage, finalAssistantMessage]);
+                setMessages([...messages, userMessage, finalAssistantMessage]);
             }
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'A apărut o eroare necunoscută.');
@@ -261,10 +337,19 @@ export default function ChatPage() {
         }
     }
 
-    const handleSubmit = (e: FormEvent) => { e.preventDefault(); sendMessage(input); };
-    const handleSuggestionClick = (text: string) => { sendMessage(text); };
+    const handleSubmit = (e: FormEvent) => { 
+        e.preventDefault(); 
+        sendMessage(input); 
+    };
+    
+    const handleSuggestionClick = (text: string) => { 
+        sendMessage(text); 
+    };
 
-    if (authLoading || !user) { return <div className="flex items-center justify-center h-screen">Se încarcă...</div>; }
+    if (authLoading || !user) { 
+        return <div className="flex items-center justify-center h-screen">Se încarcă...</div>; 
+    }
+    
     if (!hasConsented) {
         return (
             <>
@@ -344,7 +429,7 @@ export default function ChatPage() {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm mx-4">
                         <h3 className="font-bold text-lg text-center">Ești sigur?</h3>
-                        <p className="text-center text-gray-600 mt-2">Vrei să ștergi definitiv conversația “{conversationToDelete.title}”?</p>
+                        <p className="text-center text-gray-600 mt-2">Vrei să ștergi definitiv conversația "{conversationToDelete.title}"?</p>
                         <div className="flex justify-center gap-4 mt-6">
                             <button onClick={() => setConversationToDelete(null)} className="px-6 py-2 rounded-lg border">Anulează</button>
                             <button onClick={handleDelete} className="px-6 py-2 rounded-lg bg-red-500 text-white">Șterge</button>
