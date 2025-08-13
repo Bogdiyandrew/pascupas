@@ -15,7 +15,6 @@ import {
   deleteDoc,
   updateDoc,
   addDoc,
-  serverTimestamp,
 } from 'firebase/firestore';
 import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
@@ -264,7 +263,7 @@ export default function ChatPage() {
                         typeof msg.contentEnc === 'string' && 
                         typeof msg.iv === 'string'
                     );
-
+                
                 // Creează obiecte curate cu EXACT 3 proprietăți
                 const userMessageToStore = {
                     role: 'user' as const,
@@ -284,7 +283,7 @@ export default function ChatPage() {
                     assistantMessageToStore,
                 ];
                 
-                // Validare finală în frontend
+                // Validare în frontend
                 const allMessagesValid = finalMessagesToStore.every((msg) => {
                     const hasCorrectKeys = Object.keys(msg).length === 3 && 
                                          msg.role && msg.contentEnc && msg.iv;
@@ -306,26 +305,29 @@ export default function ChatPage() {
                 try {
                     if (activeConversationId) {
                         const docRef = doc(db, 'conversations', activeConversationId);
-                        await updateDoc(docRef, { 
+                        const updateData = { 
                             messages: finalMessagesToStore, 
-                            updatedAt: serverTimestamp() 
-                        });
+                            updatedAt: new Date()
+                        };
+                        await updateDoc(docRef, updateData);
                     } else {
                         const newTitle = userMessage.content.substring(0, 40) + (userMessage.content.length > 40 ? '…' : '');
+                        const now = new Date();
                         const data = { 
                             userId: user.uid, 
                             title: newTitle, 
                             messages: finalMessagesToStore, 
-                            createdAt: serverTimestamp(), 
-                            updatedAt: serverTimestamp()
+                            createdAt: now,
+                            updatedAt: now
                         };
                         const docRef = await addDoc(collection(db, 'conversations'), data);
                         setActiveConversationId(docRef.id);
                     }
                     await fetchConversations();
-                } catch (firestoreError: any) {
+                } catch (firestoreError: unknown) {
                     console.error('Firestore error:', firestoreError);
-                    setError(`Eroare la salvare: ${firestoreError.message || 'Eroare necunoscută'}`);
+                    const errorMessage = firestoreError instanceof Error ? firestoreError.message : 'Eroare necunoscută';
+                    setError(`Eroare la salvare în baza de date: ${errorMessage}`);
                 }
             } else {
                 setMessages([...messages, userMessage, finalAssistantMessage]);
@@ -429,7 +431,7 @@ export default function ChatPage() {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm mx-4">
                         <h3 className="font-bold text-lg text-center">Ești sigur?</h3>
-                        <p className="text-center text-gray-600 mt-2">Vrei să ștergi definitiv conversația "{conversationToDelete.title}"?</p>
+                        <p className="text-center text-gray-600 mt-2">Vrei să ștergi definitiv conversația &ldquo;{conversationToDelete.title}&rdquo;?</p>
                         <div className="flex justify-center gap-4 mt-6">
                             <button onClick={() => setConversationToDelete(null)} className="px-6 py-2 rounded-lg border">Anulează</button>
                             <button onClick={handleDelete} className="px-6 py-2 rounded-lg bg-red-500 text-white">Șterge</button>
