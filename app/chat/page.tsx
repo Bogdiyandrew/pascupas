@@ -72,7 +72,6 @@ function ConsentModal({ onAccept, onDecline, noStore, setNoStore }: { onAccept: 
 }
 
 export default function ChatPage() {
-    // MODIFICARE: Adăugăm funcțiile din context
     const { user, loading: authLoading, cryptoReady, canSendMessage, incrementMessagesUsed, getMessagesRemaining } = useAuth();
     const router = useRouter();
     const [hasConsented, setHasConsented] = useState(false);
@@ -182,7 +181,7 @@ export default function ChatPage() {
     };
 
     async function sendMessage(text: string) {
-        // MODIFICARE CHEIE 1: Verificăm dacă utilizatorul poate trimite mesaje
+        // MODIFICARE 1: Verificăm dacă utilizatorul poate trimite mesaje
         if (!canSendMessage()) {
             setError('Ai atins limita de mesaje pentru această lună. Treci la un plan superior pentru a continua.');
             return;
@@ -218,10 +217,8 @@ export default function ChatPage() {
 
             if (!res.ok || !res.body) throw new Error('A apărut o eroare la server. Încearcă din nou.');
             
-            // MODIFICARE CHEIE 2: Incrementăm contorul după succes
-            if (!noStore) {
-                await incrementMessagesUsed();
-            }
+            // MODIFICARE 2: Incrementăm contorul indiferent de modul privat
+            await incrementMessagesUsed();
 
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
@@ -241,6 +238,7 @@ export default function ChatPage() {
 
             const finalAssistantMessage: Message = { role: 'assistant', content: aiText };
             
+            // Logica de salvare a conversației rămâne dependentă de modul privat
             if (!noStore && cryptoReady) {
                 if (!isChatCryptoReady()) {
                     setError('Criptarea nu mai este disponibilă. Te rog să te re-loghezi.');
@@ -272,12 +270,7 @@ export default function ChatPage() {
                         role: msg.role,
                         contentEnc: msg.contentEnc!,
                         iv: msg.iv!
-                    }))
-                    .filter(msg => 
-                        typeof msg.role === 'string' && 
-                        typeof msg.contentEnc === 'string' && 
-                        typeof msg.iv === 'string'
-                    );
+                    }));
                 
                 const userMessageToStore = {
                     role: 'user' as const,
@@ -297,24 +290,6 @@ export default function ChatPage() {
                     assistantMessageToStore,
                 ];
                 
-                const allMessagesValid = finalMessagesToStore.every((msg) => {
-                    const hasCorrectKeys = Object.keys(msg).length === 3 && 
-                                         msg.role && msg.contentEnc && msg.iv;
-                    const hasCorrectTypes = typeof msg.role === 'string' && 
-                                          typeof msg.contentEnc === 'string' && 
-                                          typeof msg.iv === 'string';
-                    const hasValidRole = msg.role === 'user' || msg.role === 'assistant';
-                    const hasValidContent = msg.contentEnc.length > 0 && msg.iv.length > 0;
-                    
-                    return hasCorrectKeys && hasCorrectTypes && hasValidRole && hasValidContent;
-                });
-
-                if (!allMessagesValid) {
-                    setError('Eroare la validarea mesajelor. Încearcă din nou.');
-                    setIsLoading(false);
-                    return;
-                }
-
                 try {
                     if (activeConversationId) {
                         const docRef = doc(db, 'conversations', activeConversationId);
@@ -406,8 +381,7 @@ export default function ChatPage() {
                             <span>Mod privat (nu salva)</span>
                         </label>
                         <p className="text-[11px] text-gray-500 mt-1">Nu înlocuiește un psiholog. În criză, sună la 112.</p>
-                        {/* MODIFICARE: Afișăm mesajele rămase */}
-                        {!noStore && <p className="text-xs text-gray-600 mt-2 font-medium">Mesaje rămase luna aceasta: {getMessagesRemaining()}</p>}
+                        <p className="text-xs text-gray-600 mt-2 font-medium">Mesaje rămase luna aceasta: {getMessagesRemaining()}</p>
                     </div>
                     <div className="flex-grow overflow-y-auto pr-2">
                         <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2"><HistoryIcon /> Istoric</h2>
@@ -513,5 +487,5 @@ function ConversationItem({ convo, isActive, isEditing, onSelect, onStartEdit, o
                 </div>
             )}
         </div>
-    );
-}
+    )
+} 
