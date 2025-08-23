@@ -2,8 +2,8 @@
 
 /**
  * Implementare securizată pentru criptarea conversațiilor de chat.
- * Cheia este derivată din token-ul Firebase în loc să fie stocată în localStorage.
- * Această abordare elimină vulnerabilitățile XSS și accesul fizic la chei.
+ * Cheia este derivată din date stabile ale utilizatorului (UID) în loc de token-ul volatil.
+ * Această abordare asigură persistența cheii între sesiuni și previne erorile de decriptare.
  */
 
 import { User } from 'firebase/auth';
@@ -12,26 +12,23 @@ class SecureChatCrypto {
     private key: CryptoKey | null = null;
 
     /**
-     * Derivează cheia de criptare din token-ul Firebase și datele utilizatorului.
-     * Această metodă înlocuiește stocarea în localStorage cu o abordare mult mai sigură.
+     * Derivează cheia de criptare din datele stabile ale utilizatorului.
+     * Această metodă este acum robustă și consistentă între sesiuni.
      */
-    async deriveKeyFromAuthToken(user: User): Promise<void> {
+    async deriveKeyFromUser(user: User): Promise<void> {
         try {
-            // Obține token-ul curent de la Firebase
-            const token = await user.getIdToken();
+            // Folosim un material stabil, derivat din UID și email.
+            // Am eliminat token-ul volatil (getIdToken).
+            const keyMaterialString = `pascupas-secret-pepper-${user.uid}-${user.email}`;
             
-            // Combină token-ul cu informații stabile despre utilizator
-            const userInfo = `${user.uid}:${user.email}`;
-            const combinedMaterial = token + userInfo;
-            
-            // Creează salt stabil din UID (același pentru același user)
+            // Creează un salt stabil din UID (același pentru același utilizator)
             const saltString = user.uid.padEnd(16, '0').slice(0, 16);
             const salt = new TextEncoder().encode(saltString);
             
-            // Importă materialul combinat pentru derivarea cheii
+            // Importă materialul pentru derivarea cheii
             const keyMaterial = await window.crypto.subtle.importKey(
                 'raw',
-                new TextEncoder().encode(combinedMaterial),
+                new TextEncoder().encode(keyMaterialString),
                 'PBKDF2',
                 false,
                 ['deriveKey']
@@ -51,7 +48,7 @@ class SecureChatCrypto {
                 ['encrypt', 'decrypt']
             );
             
-            console.log('Cheia de criptare a fost derivată cu succes din token-ul Firebase');
+            console.log('Cheia de criptare a fost derivată cu succes din datele utilizatorului.');
         } catch (error) {
             console.error('Eroare la derivarea cheii de criptare:', error);
             throw new Error('Nu s-a putut inițializa criptarea. Încearcă să te re-loghezi.');
@@ -82,7 +79,7 @@ class SecureChatCrypto {
                 encodedText
             );
 
-            // Convertește la format hex pentru compatibilitate cu implementarea existentă
+            // Convertește la format hex pentru compatibilitate
             const ciphertext = Array.from(new Uint8Array(ciphertextBuffer))
                 .map(b => b.toString(16).padStart(2, '0'))
                 .join('');
@@ -134,16 +131,10 @@ class SecureChatCrypto {
         }
     }
 
-    /**
-     * Verifică dacă cheia de criptare este disponibilă.
-     */
     isReady(): boolean {
         return this.key !== null;
     }
 
-    /**
-     * Curăță cheia din memorie (la logout pentru securitate).
-     */
     clearKey(): void {
         this.key = null;
         console.log('Cheia de criptare a fost ștearsă din memorie pentru securitate');
@@ -158,7 +149,7 @@ const chatCrypto = new SecureChatCrypto();
  * Această funcție trebuie apelată după autentificare.
  */
 export async function initializeChatCrypto(user: User): Promise<void> {
-    await chatCrypto.deriveKeyFromAuthToken(user);
+    await chatCrypto.deriveKeyFromUser(user);
 }
 
 /**
@@ -178,9 +169,6 @@ export function clearChatCrypto(): void {
 
 /**
  * Criptează un text folosind AES-GCM.
- * Funcție compatibilă cu implementarea existentă.
- * @param {string} plaintext - Textul de criptat.
- * @returns {Promise<{ciphertext: string, iv: string}>} Obiect cu textul criptat și IV-ul.
  */
 export async function encryptText(plaintext: string): Promise<{ ciphertext: string; iv: string }> {
     const result = await chatCrypto.encrypt(plaintext);
@@ -192,10 +180,6 @@ export async function encryptText(plaintext: string): Promise<{ ciphertext: stri
 
 /**
  * Decriptează un text folosind AES-GCM.
- * Funcție compatibilă cu implementarea existentă.
- * @param {string} ciphertext - Textul criptat.
- * @param {string} iv - Initialization Vector-ul folosit la criptare.
- * @returns {Promise<string>} Textul decriptat.
  */
 export async function decryptText(ciphertext: string, iv: string): Promise<string> {
     return chatCrypto.decrypt(ciphertext, iv);

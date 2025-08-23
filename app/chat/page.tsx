@@ -192,7 +192,6 @@ export default function ChatPage() {
             return;
         }
 
-        // Verifică dacă criptarea este disponibilă
         if (!noStore && !cryptoReady) {
             setError('Criptarea nu este încă disponibilă. Te rog să aștepți sau să te re-loghezi.');
             return;
@@ -236,18 +235,15 @@ export default function ChatPage() {
             const finalAssistantMessage: Message = { role: 'assistant', content: aiText };
             
             if (!noStore && cryptoReady) {
-                // Verifică din nou dacă criptarea este disponibilă
                 if (!isChatCryptoReady()) {
                     setError('Criptarea nu mai este disponibilă. Te rog să te re-loghezi.');
                     setIsLoading(false);
                     return;
                 }
 
-                // Criptare cu implementarea securizată
                 const userEncryption = await encryptText(userMessage.content);
                 const assistantEncryption = await encryptText(finalAssistantMessage.content);
                 
-                // Verifică că criptarea a funcționat
                 if (!userEncryption?.ciphertext || !userEncryption?.iv || 
                     !assistantEncryption?.ciphertext || !assistantEncryption?.iv) {
                     setError('Eroare la criptarea mesajelor. Verifică dacă ești conectat și încearcă din nou.');
@@ -263,7 +259,6 @@ export default function ChatPage() {
 
                 setMessages([...messages, finalUserMessageForState, finalAssistantMessageForState]);
 
-                // Pregătire mesaje pentru stocare
                 const previousMessagesToStore = messages
                     .filter(msg => msg.contentEnc && msg.iv && msg.role)
                     .map(msg => ({
@@ -277,7 +272,6 @@ export default function ChatPage() {
                         typeof msg.iv === 'string'
                     );
                 
-                // Creează obiecte curate cu EXACT 3 proprietăți
                 const userMessageToStore = {
                     role: 'user' as const,
                     contentEnc: userCiphertext,
@@ -296,7 +290,6 @@ export default function ChatPage() {
                     assistantMessageToStore,
                 ];
                 
-                // Validare în frontend
                 const allMessagesValid = finalMessagesToStore.every((msg) => {
                     const hasCorrectKeys = Object.keys(msg).length === 3 && 
                                          msg.role && msg.contentEnc && msg.iv;
@@ -323,11 +316,7 @@ export default function ChatPage() {
                             updatedAt: new Date()
                         };
                         await updateDoc(docRef, updateData);
-                    } else if (!noStore && !cryptoReady) {
-                setError('Criptarea nu este disponibilă. Încearcă să te re-loghezi.');
-                setIsLoading(false);
-                return;
-            } else {
+                    } else {
                         const newTitle = userMessage.content.substring(0, 40) + (userMessage.content.length > 40 ? '…' : '');
                         const now = new Date();
                         const data = { 

@@ -19,18 +19,23 @@ const CloseIcon = () => (
     </svg>
 );
 
+const CreditCardIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+    </svg>
+);
 
 export default function Header() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // Stare pentru meniul mobil
-  const { user } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, userDoc } = useAuth(); // Adăugat userDoc pentru info plan
   const auth = getAuth();
   const router = useRouter();
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      setIsMenuOpen(false); // Închide meniul după logout
+      setIsMenuOpen(false);
     } catch (error) {
       console.error("Eroare la deconectare:", error);
     }
@@ -41,13 +46,26 @@ export default function Header() {
       e.preventDefault();
       setIsAuthModalOpen(true);
     }
-    setIsMenuOpen(false); // Închide meniul la click
+    setIsMenuOpen(false);
+  };
+
+  const handlePlanuriLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!user) {
+      e.preventDefault();
+      setIsAuthModalOpen(true);
+    }
+    setIsMenuOpen(false);
   };
   
   const openAuthModal = () => {
     setIsAuthModalOpen(true);
     setIsMenuOpen(false);
   }
+
+  // Verifică dacă utilizatorul e pe planul gratuit și are mesaje puține
+  const shouldHighlightPlanuri = userDoc?.currentPlan === 'free' && 
+    userDoc?.messagesLimit > 0 && 
+    (userDoc.messagesLimit - userDoc.messagesThisMonth) <= 5;
 
   return (
     <>
@@ -61,13 +79,37 @@ export default function Header() {
           <nav className="hidden md:flex items-center space-x-4">
             {user ? (
               <>
-                <Link href="/chat" className="font-bold text-text hover:text-primary transition-colors">Conversații</Link>
-                <button onClick={handleLogout} className="bg-primary text-white px-5 py-2 rounded-lg font-bold hover:bg-opacity-90 transition-colors">Deconectare</button>
+                <Link href="/chat" className="font-bold text-text hover:text-primary transition-colors">
+                  Conversații
+                </Link>
+                <Link 
+                  href="/planuri" 
+                  className={`flex items-center gap-1 font-bold transition-colors ${
+                    shouldHighlightPlanuri 
+                      ? 'text-orange-600 hover:text-orange-700' 
+                      : 'text-text hover:text-primary'
+                  }`}
+                >
+                  <CreditCardIcon />
+                  Planuri
+                  {shouldHighlightPlanuri && (
+                    <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full ml-1">
+                      !
+                    </span>
+                  )}
+                </Link>
+                <button onClick={handleLogout} className="bg-primary text-white px-5 py-2 rounded-lg font-bold hover:bg-opacity-90 transition-colors">
+                  Deconectare
+                </button>
               </>
             ) : (
               <>
-                <button onClick={openAuthModal} className="font-bold text-text hover:text-primary transition-colors">Conectare</button>
-                <button onClick={openAuthModal} className="bg-primary text-white px-5 py-2 rounded-lg font-bold hover:bg-opacity-90 transition-colors">Înregistrare</button>
+                <button onClick={openAuthModal} className="font-bold text-text hover:text-primary transition-colors">
+                  Conectare
+                </button>
+                <button onClick={openAuthModal} className="bg-primary text-white px-5 py-2 rounded-lg font-bold hover:bg-opacity-90 transition-colors">
+                  Înregistrare
+                </button>
               </>
             )}
           </nav>
@@ -86,13 +128,38 @@ export default function Header() {
                 <nav className="container mx-auto flex flex-col items-center space-y-4 py-6">
                     {user ? (
                       <>
-                        <Link href="/chat" onClick={handleChatLinkClick} className="font-bold text-text hover:text-primary transition-colors text-lg">Conversații</Link>
-                        <button onClick={handleLogout} className="bg-primary text-white w-full max-w-xs px-5 py-3 rounded-lg font-bold hover:bg-opacity-90 transition-colors text-lg">Deconectare</button>
+                        <Link href="/chat" onClick={handleChatLinkClick} className="font-bold text-text hover:text-primary transition-colors text-lg">
+                          Conversații
+                        </Link>
+                        <Link 
+                          href="/planuri" 
+                          onClick={handlePlanuriLinkClick}
+                          className={`flex items-center gap-2 font-bold transition-colors text-lg ${
+                            shouldHighlightPlanuri 
+                              ? 'text-orange-600 hover:text-orange-700' 
+                              : 'text-text hover:text-primary'
+                          }`}
+                        >
+                          <CreditCardIcon />
+                          Planuri
+                          {shouldHighlightPlanuri && (
+                            <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
+                              Upgrade
+                            </span>
+                          )}
+                        </Link>
+                        <button onClick={handleLogout} className="bg-primary text-white w-full max-w-xs px-5 py-3 rounded-lg font-bold hover:bg-opacity-90 transition-colors text-lg">
+                          Deconectare
+                        </button>
                       </>
                     ) : (
                       <>
-                        <button onClick={openAuthModal} className="font-bold text-text hover:text-primary transition-colors text-lg">Conectare</button>
-                        <button onClick={openAuthModal} className="bg-primary text-white w-full max-w-xs px-5 py-3 rounded-lg font-bold hover:bg-opacity-90 transition-colors text-lg">Înregistrare</button>
+                        <button onClick={openAuthModal} className="font-bold text-text hover:text-primary transition-colors text-lg">
+                          Conectare
+                        </button>
+                        <button onClick={openAuthModal} className="bg-primary text-white w-full max-w-xs px-5 py-3 rounded-lg font-bold hover:bg-opacity-90 transition-colors text-lg">
+                          Înregistrare
+                        </button>
                       </>
                     )}
                 </nav>
