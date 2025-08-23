@@ -4,12 +4,11 @@ import { useState, FormEvent } from 'react';
 import { 
   getAuth, 
   createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup
-  // Am eliminat 'FirebaseError' care nu este exportat
 } from 'firebase/auth';
 import { app } from '@/lib/firebase';
+import { useAuth } from '@/context/AuthContext'; // MODIFICARE: Importăm useAuth
 
 // --- Componente Iconițe ---
 const CloseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
@@ -30,6 +29,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
   const [error, setError] = useState('');
   
   const auth = getAuth(app);
+  const { signIn } = useAuth(); // MODIFICARE: Folosim funcția signIn din context
   const googleProvider = new GoogleAuthProvider();
 
   if (!isOpen) return null;
@@ -40,13 +40,14 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
 
     try {
       if (isLoginView) {
-        await signInWithEmailAndPassword(auth, email, password);
+        // MODIFICARE: Apelăm funcția signIn din context
+        await signIn(email, password);
       } else {
+        // Pentru înregistrare, putem păstra apelul direct sau putem crea o funcție signUp în context
         await createUserWithEmailAndPassword(auth, email, password);
       }
-      onClose(); // Închide modalul după succes
+      onClose();
     } catch (err: unknown) { 
-      // CORECTAT: Verificăm dacă eroarea are o proprietate 'code'
       if (typeof err === 'object' && err !== null && 'code' in err) {
         setError(getFirebaseErrorMessage((err as { code: string }).code));
       } else {
@@ -61,7 +62,6 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
         await signInWithPopup(auth, googleProvider);
         onClose();
     } catch (err: unknown) {
-        // CORECTAT: Verificăm dacă eroarea are o proprietate 'code'
         if (typeof err === 'object' && err !== null && 'code' in err) {
             setError(getFirebaseErrorMessage((err as { code: string }).code));
         } else {
@@ -70,18 +70,22 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
     }
   };
 
-  // Funcție ajutătoare pentru a traduce codurile de eroare Firebase
   const getFirebaseErrorMessage = (errorCode: string) => {
     switch (errorCode) {
       case 'auth/invalid-email':
         return 'Adresa de email nu este validă.';
       case 'auth/user-not-found':
       case 'auth/wrong-password':
+      case 'auth/invalid-credential': // Adăugat pentru erori mai noi de la Firebase
         return 'Email sau parolă incorectă.';
       case 'auth/email-already-in-use':
         return 'Acest email este deja folosit.';
       case 'auth/weak-password':
         return 'Parola trebuie să aibă cel puțin 6 caractere.';
+      case 'auth/popup-blocked':
+        return 'Fereastra de autentificare a fost blocată de browser.';
+      case 'auth/popup-closed-by-user':
+        return 'Fereastra de autentificare a fost închisă.';
       default:
         return 'A apărut o eroare. Vă rugăm să încercați din nou.';
     }
