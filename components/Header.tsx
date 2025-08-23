@@ -1,4 +1,4 @@
-'use client';
+'use client'; // <-- MODIFICAREA CHEIE
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -27,42 +27,32 @@ const CreditCardIcon = () => (
 
 export default function Header() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [initialModalView, setInitialModalView] = useState<'login' | 'register'>('login');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, userDoc } = useAuth(); // Adăugat userDoc pentru info plan
-  const auth = getAuth();
+  const { user, userDoc, logout } = useAuth();
   const router = useRouter();
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await logout();
       setIsMenuOpen(false);
     } catch (error) {
       console.error("Eroare la deconectare:", error);
     }
   };
-
-  const handleChatLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!user) {
-      e.preventDefault();
-      setIsAuthModalOpen(true);
-    }
-    setIsMenuOpen(false);
-  };
-
-  const handlePlanuriLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!user) {
-      e.preventDefault();
-      setIsAuthModalOpen(true);
-    }
-    setIsMenuOpen(false);
-  };
   
-  const openAuthModal = () => {
+  const openLoginModal = () => {
+    setInitialModalView('login');
     setIsAuthModalOpen(true);
     setIsMenuOpen(false);
   }
 
-  // Verifică dacă utilizatorul e pe planul gratuit și are mesaje puține
+  const openRegisterModal = () => {
+    setInitialModalView('register');
+    setIsAuthModalOpen(true);
+    setIsMenuOpen(false);
+  }
+
   const shouldHighlightPlanuri = userDoc?.currentPlan === 'free' && 
     userDoc?.messagesLimit > 0 && 
     (userDoc.messagesLimit - userDoc.messagesThisMonth) <= 5;
@@ -75,7 +65,6 @@ export default function Header() {
             PascuPas<span className="text-primary">.online</span>
           </Link>
 
-          {/* Navigare Desktop */}
           <nav className="hidden md:flex items-center space-x-4">
             {user ? (
               <>
@@ -104,17 +93,16 @@ export default function Header() {
               </>
             ) : (
               <>
-                <button onClick={openAuthModal} className="font-bold text-text hover:text-primary transition-colors">
+                <button onClick={openLoginModal} className="font-bold text-text hover:text-primary transition-colors">
                   Conectare
                 </button>
-                <button onClick={openAuthModal} className="bg-primary text-white px-5 py-2 rounded-lg font-bold hover:bg-opacity-90 transition-colors">
+                <button onClick={openRegisterModal} className="bg-primary text-white px-5 py-2 rounded-lg font-bold hover:bg-opacity-90 transition-colors">
                   Înregistrare
                 </button>
               </>
             )}
           </nav>
 
-          {/* Buton Meniu Mobil */}
           <div className="md:hidden">
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-text">
                 {isMenuOpen ? <CloseIcon /> : <MenuIcon />}
@@ -122,18 +110,17 @@ export default function Header() {
           </div>
         </div>
         
-        {/* Meniu Mobil Dropdown */}
         {isMenuOpen && (
             <div className="md:hidden absolute top-full left-0 w-full bg-background/95 backdrop-blur-md shadow-lg">
                 <nav className="container mx-auto flex flex-col items-center space-y-4 py-6">
                     {user ? (
                       <>
-                        <Link href="/chat" onClick={handleChatLinkClick} className="font-bold text-text hover:text-primary transition-colors text-lg">
+                        <Link href="/chat" onClick={() => setIsMenuOpen(false)} className="font-bold text-text hover:text-primary transition-colors text-lg">
                           Conversații
                         </Link>
                         <Link 
                           href="/planuri" 
-                          onClick={handlePlanuriLinkClick}
+                          onClick={() => setIsMenuOpen(false)}
                           className={`flex items-center gap-2 font-bold transition-colors text-lg ${
                             shouldHighlightPlanuri 
                               ? 'text-orange-600 hover:text-orange-700' 
@@ -154,10 +141,10 @@ export default function Header() {
                       </>
                     ) : (
                       <>
-                        <button onClick={openAuthModal} className="font-bold text-text hover:text-primary transition-colors text-lg">
+                        <button onClick={openLoginModal} className="font-bold text-text hover:text-primary transition-colors text-lg">
                           Conectare
                         </button>
-                        <button onClick={openAuthModal} className="bg-primary text-white w-full max-w-xs px-5 py-3 rounded-lg font-bold hover:bg-opacity-90 transition-colors text-lg">
+                        <button onClick={openRegisterModal} className="bg-primary text-white w-full max-w-xs px-5 py-3 rounded-lg font-bold hover:bg-opacity-90 transition-colors text-lg">
                           Înregistrare
                         </button>
                       </>
@@ -166,7 +153,11 @@ export default function Header() {
             </div>
         )}
       </header>
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)}
+        initialView={initialModalView} 
+      />
     </>
   );
 }

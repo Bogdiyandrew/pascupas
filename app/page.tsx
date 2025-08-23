@@ -13,16 +13,16 @@ const BrainIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w
 const ClockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-accent-green" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>;
 
-
-// --- Componentele Paginilor ---
-
 const HeroSection = () => {
     const { user } = useAuth();
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    // Adăugăm și aici starea pentru a o trimite modalului
+    const [initialModalView, setInitialModalView] = useState<'login' | 'register'>('login');
   
     const handleStartConversationClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
       if (!user) {
         e.preventDefault();
+        setInitialModalView('register'); // Când cineva apasă "Începe", probabil vrea să se înregistreze
         setIsAuthModalOpen(true);
       }
     };
@@ -42,7 +42,12 @@ const HeroSection = () => {
             </Link>
             </div>
         </section>
-        <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+        {/* MODIFICARE: Adăugăm proprietatea initialView */}
+        <AuthModal 
+            isOpen={isAuthModalOpen} 
+            onClose={() => setIsAuthModalOpen(false)} 
+            initialView={initialModalView} 
+        />
         </>
     );
 };
@@ -93,20 +98,18 @@ const PricingSection = () => (
             </div>
             
             <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-                {/* Plan Gratuit */}
                 <div className="border border-gray-200 rounded-xl p-8 flex flex-col">
                     <h3 className="font-poppins font-bold text-2xl text-text mb-2">Gratuit</h3>
                     <p className="text-gray-600 mb-6 h-12">Pentru a testa conversațiile</p>
                     <p className="font-poppins font-extrabold text-5xl text-text mb-6">0<span className="text-lg font-bold"> RON</span></p>
                     <ul className="space-y-4 mb-8 text-gray-700">
-                        <li className="flex items-center gap-3"><CheckIcon /> 5 conversații lunare</li>
+                        <li className="flex items-center gap-3"><CheckIcon /> 15 mesaje lunare</li>
                     </ul>
                     <div className="mt-auto">
                         <Link href="/chat" className="w-full block text-center bg-gray-200 text-text font-bold px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors">Continuă gratuit</Link>
                     </div>
                 </div>
 
-                {/* Plan Anual (Recomandat) */}
                 <div className="border-2 border-primary rounded-xl p-8 flex flex-col relative shadow-2xl">
                     <span className="absolute top-0 -translate-y-1/2 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full self-center">RECOMANDAT</span>
                     <h3 className="font-poppins font-bold text-2xl text-primary mb-2">Premium Anual</h3>
@@ -119,11 +122,10 @@ const PricingSection = () => (
                         <li className="flex items-center gap-3"><CheckIcon /> Acces la viitoare funcționalități</li>
                     </ul>
                     <div className="mt-auto">
-                        <button className="w-full bg-primary text-white font-bold px-6 py-3 rounded-lg hover:bg-opacity-90 transition-colors">Alege Premium Anual</button>
+                        <Link href="/planuri" className="w-full block text-center bg-primary text-white font-bold px-6 py-3 rounded-lg hover:bg-opacity-90 transition-colors">Alege Premium Anual</Link>
                     </div>
                 </div>
 
-                {/* Plan Lunar */}
                 <div className="border border-gray-200 rounded-xl p-8 flex flex-col">
                     <h3 className="font-poppins font-bold text-2xl text-text mb-2">Premium Lunar</h3>
                     <p className="text-gray-600 mb-6 h-12">Flexibilitate maximă</p>
@@ -134,7 +136,7 @@ const PricingSection = () => (
                         <li className="flex items-center gap-3"><CheckIcon /> Istoric complet salvat</li>
                     </ul>
                     <div className="mt-auto">
-                        <button className="w-full bg-gray-800 text-white font-bold px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors">Alege Premium Lunar</button>
+                         <Link href="/planuri" className="w-full block text-center bg-gray-800 text-white font-bold px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors">Alege Premium Lunar</Link>
                     </div>
                 </div>
             </div>
@@ -150,9 +152,9 @@ const Footer = () => (
         Acest serviciu este un instrument de suport emoțional și nu înlocuiește terapia medicală sau consultul unui specialist licențiat. Pentru probleme grave de sănătate mintală, vă rugăm să consultați un medic sau un psihoterapeut.
       </p>
       <div className="space-x-4">
-        <a href="#" className="hover:text-primary">Politică de Confidențialitate</a>
+        <Link href="/politica-confidentialitate" className="hover:text-primary">Politică de Confidențialitate</Link>
         <span>|</span>
-        <a href="#" className="hover:text-primary">Contact</a>
+        <Link href="/termeni" className="hover:text-primary">Termeni și Condiții</Link>
       </div>
        <p className="mt-6 text-gray-400">&copy; {new Date().getFullYear()} PascuPas.online. Toate drepturile rezervate.</p>
     </div>

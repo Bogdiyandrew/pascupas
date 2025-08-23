@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { 
   getAuth, 
   createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup
 } from 'firebase/auth';
 import { app } from '@/lib/firebase';
-import { useAuth } from '@/context/AuthContext'; // MODIFICARE: Importăm useAuth
+import { useAuth } from '@/context/AuthContext';
 
 // --- Componente Iconițe ---
 const CloseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
@@ -22,15 +23,22 @@ const GoogleIcon = () => (
     </svg>
 );
 
-export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
-  const [isLoginView, setIsLoginView] = useState(true);
+export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: boolean, onClose: () => void, initialView: 'login' | 'register' }) {
+  const [isLoginView, setIsLoginView] = useState(initialView === 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   
   const auth = getAuth(app);
-  const { signIn } = useAuth(); // MODIFICARE: Folosim funcția signIn din context
+  const { signIn } = useAuth();
   const googleProvider = new GoogleAuthProvider();
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsLoginView(initialView === 'login');
+      setError('');
+    }
+  }, [isOpen, initialView]);
 
   if (!isOpen) return null;
 
@@ -40,10 +48,8 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
 
     try {
       if (isLoginView) {
-        // MODIFICARE: Apelăm funcția signIn din context
         await signIn(email, password);
       } else {
-        // Pentru înregistrare, putem păstra apelul direct sau putem crea o funcție signUp în context
         await createUserWithEmailAndPassword(auth, email, password);
       }
       onClose();
@@ -74,9 +80,10 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
     switch (errorCode) {
       case 'auth/invalid-email':
         return 'Adresa de email nu este validă.';
+      // MODIFICARE: Am adăugat 'auth/invalid-credential'
       case 'auth/user-not-found':
       case 'auth/wrong-password':
-      case 'auth/invalid-credential': // Adăugat pentru erori mai noi de la Firebase
+      case 'auth/invalid-credential':
         return 'Email sau parolă incorectă.';
       case 'auth/email-already-in-use':
         return 'Acest email este deja folosit.';
