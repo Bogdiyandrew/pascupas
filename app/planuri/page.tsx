@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Am adăugat useEffect
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
 import { PLANS, PlanType } from '@/types/subscription';
 
-// Iconițe
+// Iconițe (rămân neschimbate)
 const CrownIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l3.5 7L12 6l3.5 4L19 3v18H5V3z" /></svg> );
 const CheckIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> );
 const ArrowLeftIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg> );
@@ -33,7 +33,6 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular }: PlanCardPro
         : 'border-gray-200 bg-white hover:border-gray-300'
     }`}>
       
-      {/* Badge popular - CORECTAT */}
       {isPopular && (
         <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
           <div className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg whitespace-nowrap">
@@ -42,7 +41,6 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular }: PlanCardPro
         </div>
       )}
       
-      {/* Badge current plan */}
       {isCurrentPlan && (
         <div className="absolute -top-3 right-4">
           <span className="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md">
@@ -52,7 +50,6 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular }: PlanCardPro
       )}
 
       <div className="text-center pt-2">
-        {/* Icon și nume */}
         <div className="flex items-center justify-center gap-2 mb-2">
           {isPremium && <CrownIcon />}
           <h3 className={`text-xl font-bold ${isPremium ? 'text-yellow-700' : 'text-gray-700'}`}>
@@ -60,7 +57,6 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular }: PlanCardPro
           </h3>
         </div>
 
-        {/* Preț */}
         <div className="mb-4">
           {plan.price === 0 ? (
             <span className="text-3xl font-bold text-gray-700">Gratuit</span>
@@ -81,7 +77,6 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular }: PlanCardPro
           )}
         </div>
 
-        {/* Features */}
         <ul className="space-y-3 mb-6 text-left">
           {plan.features.map((feature, index) => (
             <li key={index} className="flex items-start gap-3">
@@ -93,7 +88,6 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular }: PlanCardPro
           ))}
         </ul>
 
-        {/* Button */}
         <button
           onClick={() => onUpgrade(planType)}
           disabled={isCurrentPlan}
@@ -122,6 +116,19 @@ export default function PlanuriPage() {
   const { user, userDoc, loading } = useAuth();
   const [isUpgrading, setIsUpgrading] = useState(false);
 
+  // --- MODIFICARE CHEIE: Adăugăm useEffect pentru a gestiona redirecționarea ---
+  useEffect(() => {
+    // Așteptăm să se termine încărcarea
+    if (!loading) {
+      // Dacă încărcarea s-a terminat și NU există un utilizator, redirecționăm
+      if (!user) {
+        console.log("Utilizator neautentificat. Redirecționare către pagina principală.");
+        router.push('/');
+      }
+    }
+  }, [user, loading, router]); // Dependințe pentru a rula efectul la schimbarea lor
+  // --------------------------------------------------------------------------
+
   const handleUpgrade = async (planType: PlanType) => {
     if (!user || !userDoc) return;
     
@@ -141,23 +148,15 @@ export default function PlanuriPage() {
     }
   };
 
-  if (loading || !user) {
+  // --- MODIFICARE: Afișăm starea de încărcare doar cât timp `loading` este true sau până la redirecționare ---
+  if (loading || !user || !userDoc) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
-
-  if (!userDoc) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-gray-600">Se încarcă informațiile despre cont...</p>
-        </div>
-      </div>
-    );
-  }
+  // --------------------------------------------------------------------------------
 
   const currentPlan = userDoc.currentPlan;
   const remaining = userDoc.messagesLimit === -1 ? -1 : userDoc.messagesLimit - userDoc.messagesThisMonth;
@@ -210,7 +209,6 @@ export default function PlanuriPage() {
               </div>
             </div>
 
-            {/* Progress bar pentru planul gratuit */}
             {currentPlan === 'free' && (
               <div className="mt-4">
                 <div className="flex justify-between text-sm text-gray-600 mb-2">
@@ -229,7 +227,6 @@ export default function PlanuriPage() {
             )}
           </div>
 
-          {/* Plans - MODIFICAT cu spațiu pentru badge */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
               Alege planul potrivit pentru tine
@@ -280,6 +277,7 @@ export default function PlanuriPage() {
           </div>
         </div>
       </div>
+      {/* <Footer /> */}
     </>
   );
 }
