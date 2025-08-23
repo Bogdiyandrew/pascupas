@@ -181,7 +181,6 @@ export default function ChatPage() {
     };
 
     async function sendMessage(text: string) {
-        // MODIFICARE 1: Verificăm dacă utilizatorul poate trimite mesaje
         if (!canSendMessage()) {
             setError('Ai atins limita de mesaje pentru această lună. Treci la un plan superior pentru a continua.');
             return;
@@ -217,7 +216,6 @@ export default function ChatPage() {
 
             if (!res.ok || !res.body) throw new Error('A apărut o eroare la server. Încearcă din nou.');
             
-            // MODIFICARE 2: Incrementăm contorul indiferent de modul privat
             await incrementMessagesUsed();
 
             const reader = res.body.getReader();
@@ -238,7 +236,6 @@ export default function ChatPage() {
 
             const finalAssistantMessage: Message = { role: 'assistant', content: aiText };
             
-            // Logica de salvare a conversației rămâne dependentă de modul privat
             if (!noStore && cryptoReady) {
                 if (!isChatCryptoReady()) {
                     setError('Criptarea nu mai este disponibilă. Te rog să te re-loghezi.');
@@ -366,6 +363,10 @@ export default function ChatPage() {
         );
     }
 
+    // MODIFICARE: Calculăm valoarea de afișat aici
+    const remainingMessages = getMessagesRemaining();
+    const displayRemaining = remainingMessages === -1 ? 'Nelimitat' : remainingMessages;
+
     return (
         <>
             <Header />
@@ -381,7 +382,8 @@ export default function ChatPage() {
                             <span>Mod privat (nu salva)</span>
                         </label>
                         <p className="text-[11px] text-gray-500 mt-1">Nu înlocuiește un psiholog. În criză, sună la 112.</p>
-                        <p className="text-xs text-gray-600 mt-2 font-medium">Mesaje rămase luna aceasta: {getMessagesRemaining()}</p>
+                        {/* MODIFICARE: Folosim valoarea calculată */}
+                        <p className="text-xs text-gray-600 mt-2 font-medium">Mesaje rămase luna aceasta: {displayRemaining}</p>
                     </div>
                     <div className="flex-grow overflow-y-auto pr-2">
                         <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2"><HistoryIcon /> Istoric</h2>
@@ -487,5 +489,5 @@ function ConversationItem({ convo, isActive, isEditing, onSelect, onStartEdit, o
                 </div>
             )}
         </div>
-    )
-} 
+    );
+}

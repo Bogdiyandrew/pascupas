@@ -4,13 +4,13 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { 
   signInWithEmailAndPassword, 
   signOut, 
-  onIdTokenChanged, // Corect: Folosim onIdTokenChanged pentru a reacționa la reîmprospătarea token-ului
+  onIdTokenChanged,
   User 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
+// MODIFICARE: Importăm onSnapshot pentru a asculta modificări în timp real
+import { doc, getDoc, setDoc, updateDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { initializeChatCrypto, clearChatCrypto } from '@/lib/cryptoChat';
-// Asigură-te că acest fișier există și exportă tipurile necesare
 import { FirebaseUser, PLANS, canSendMessage, getMessagesRemaining } from '@/types/subscription';
 
 interface AuthContextType {
@@ -21,12 +21,10 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   
-  // Funcții pentru gestionarea planurilor și a mesajelor
   canSendMessage: () => boolean;
   getMessagesRemaining: () => number;
   getCurrentPlan: () => string;
   incrementMessagesUsed: () => Promise<void>;
-  checkAndResetMonth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -37,7 +35,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [cryptoReady, setCryptoReady] = useState(false);
 
-  // Funcție pentru a inițializa un utilizator nou în Firestore cu planul gratuit
   const initializeNewUser = async (firebaseUser: User): Promise<FirebaseUser> => {
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -47,124 +44,113 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       createdAt: Timestamp.fromDate(now),
       currentPlan: 'free',
       messagesThisMonth: 0,
-      messagesLimit: 15, // Limita pentru planul gratuit
+      messagesLimit: PLANS.free.messagesLimit,
       resetDate: Timestamp.fromDate(nextMonth),
       planStartDate: Timestamp.fromDate(now)
     };
 
     await setDoc(doc(db, 'users', firebaseUser.uid), newUserDoc);
-    console.log('✅ Utilizator nou inițializat cu planul gratuit (15 mesaje/lună)');
+    console.log('✅ Utilizator nou inițializat cu planul gratuit.');
     return newUserDoc;
   };
   
   const signIn = async (email: string, password: string) => {
-    setLoading(true);
-    setCryptoReady(false);
-    
-    try {
-      // Autentificarea va declanșa automat listener-ul onIdTokenChanged,
-      // care va gestiona inițializarea criptării și încărcarea datelor utilizatorului.
-      await signInWithEmailAndPassword(auth, email, password);
-      console.log('Autentificare cu succes. Se așteaptă listener-ul onIdTokenChanged...');
-    } catch (error) {
-      console.error('Eroare la autentificare:', error);
-      setCryptoReady(false);
-      setLoading(false); // Oprește încărcarea în caz de eroare
-      throw error;
-    }
+    await signInWithEmailAndPassword(auth, email, password);
   };
 
   const logout = async () => {
-    try {
-      console.log('Curățarea cheii de criptare la logout...');
-      clearChatCrypto();
-      setCryptoReady(false);
-      
-      await signOut(auth);
-      setUser(null);
-      setUserDoc(null);
-      console.log('Logout complet.');
-    } catch (error) {
-      console.error('Eroare la logout:', error);
-      throw error;
-    }
+    await signOut(auth);
   };
 
   useEffect(() => {
-    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
-      setLoading(true);
-      if (firebaseUser) {
-        // Un utilizator este autentificat sau token-ul a fost reîmprospătat
-        setUser(firebaseUser);
+    let unsubscribeFromFirestore: (() => void) | null = null;
 
+    const unsubscribeFromAuth = onIdTokenChanged(auth, async (firebaseUser) => {
+      // Dacă există un listener activ de la un user anterior, îl oprim
+      if (unsubscribeFromFirestore) {
+        unsubscribeFromFirestore();
+      }
+
+      if (firebaseUser) {
+        setLoading(true);
+        setUser(firebaseUser);
+        
         try {
-          console.log('🔄 Utilizator detectat sau token reîmprospătat. Re-inițializez criptarea...');
           await initializeChatCrypto(firebaseUser);
           setCryptoReady(true);
-          console.log('✅ Criptarea a fost re-inițializată cu succes.');
-
-          // Încarcă sau creează documentul utilizatorului
+          
           const userDocRef = doc(db, 'users', firebaseUser.uid);
-          const userDocSnap = await getDoc(userDocRef);
           
-          let userData: FirebaseUser;
-          
-          if (userDocSnap.exists()) {
-            userData = userDocSnap.data() as FirebaseUser;
-            console.log('📄 Document utilizator încărcat din Firestore.');
-          } else {
-            console.log('👤 Se creează un document nou pentru utilizator...');
-            userData = await initializeNewUser(firebaseUser);
-          }
-          
-          // Verifică și resetează contorul lunar de mesaje dacă este necesar
-          const now = new Date();
-          const resetDate = userData.resetDate.toDate();
-
-          if (now >= resetDate) {
-              console.log('🔄 Resetez mesajele pentru luna nouă...');
-              const nextResetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-              const limit = PLANS[userData.currentPlan].messagesLimit;
+          // --- MODIFICARE CHEIE: Implementăm listener-ul onSnapshot ---
+          unsubscribeFromFirestore = onSnapshot(userDocRef, async (docSnap) => {
+            if (docSnap.exists()) {
+              let userData = docSnap.data() as FirebaseUser;
+              console.log('📄 Document utilizator (re)încărcat în timp real.');
               
-              const updatedFields: Partial<FirebaseUser> = {
-                  messagesThisMonth: 0,
-                  messagesLimit: limit,
-                  resetDate: Timestamp.fromDate(nextResetDate)
-              };
+              const expectedLimit = PLANS[userData.currentPlan]?.messagesLimit ?? PLANS.free.messagesLimit;
+              let needsUpdate = false;
+              const updates: Partial<FirebaseUser> = {};
 
-              await updateDoc(userDocRef, updatedFields);
-              // Actualizează userData cu noile valori
-              userData = { ...userData, ...updatedFields } as FirebaseUser;
-              console.log('✅ Mesaje resetate.');
-          }
-          
-          setUserDoc(userData);
-          
+              // --- LOGICA DE AUTO-CORECTIE ---
+              if (userData.messagesLimit !== expectedLimit) {
+                updates.messagesLimit = expectedLimit;
+                needsUpdate = true;
+                console.log(`🔧 Limita de mesaje nu corespunde planului. Se actualizează la: ${expectedLimit}`);
+              }
+
+              // Verificăm și resetăm luna, dacă este cazul
+              const now = new Date();
+              if (now >= userData.resetDate.toDate()) {
+                  updates.messagesThisMonth = 0;
+                  updates.resetDate = Timestamp.fromDate(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+                  needsUpdate = true;
+                  console.log('🔄 Resetez mesajele pentru luna nouă...');
+              }
+
+              if (needsUpdate) {
+                // Actualizăm documentul, iar onSnapshot va prelua automat modificarea
+                await updateDoc(userDocRef, updates);
+              } else {
+                // Dacă nu e nevoie de update, setăm direct starea
+                setUserDoc(userData);
+              }
+
+            } else {
+              const newUserData = await initializeNewUser(firebaseUser);
+              setUserDoc(newUserData);
+            }
+            setLoading(false);
+          });
+
         } catch (error) {
-          console.error('❌ Eroare la re-inițializarea criptării sau încărcarea datelor:', error);
+          console.error('❌ Eroare la inițializarea utilizatorului:', error);
           setCryptoReady(false);
-          // O strategie de fallback, cum ar fi logout forțat, ar putea fi adăugată aici
+          setLoading(false);
         }
       } else {
-        // Utilizatorul nu este autentificat
+        // Când nu există utilizator, curățăm tot
         clearChatCrypto();
         setCryptoReady(false);
         setUser(null);
         setUserDoc(null);
-        console.log('🔒 Niciun utilizator autentificat.');
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Funcția de curățare la demontarea componentei
+    return () => {
+      unsubscribeFromAuth();
+      if (unsubscribeFromFirestore) {
+        unsubscribeFromFirestore();
+      }
+    };
   }, []);
 
   const incrementMessagesUsed = async (): Promise<void> => {
     if (!user || !userDoc) return;
     const newCount = userDoc.messagesThisMonth + 1;
     await updateDoc(doc(db, 'users', user.uid), { messagesThisMonth: newCount });
-    setUserDoc(prev => prev ? { ...prev, messagesThisMonth: newCount } : null);
-    console.log(`📊 Mesaje folosite: ${newCount}/${userDoc.messagesLimit}`);
+    // Nu mai este nevoie să actualizăm starea locală, onSnapshot se ocupă
   };
 
   const canSendMessageCheck = (): boolean => {
@@ -192,8 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canSendMessage: canSendMessageCheck,
       getMessagesRemaining: getMessagesRemainingCount,
       getCurrentPlan,
-      incrementMessagesUsed,
-      checkAndResetMonth: async () => {}, // Logica este acum automată în useEffect
+      incrementMessagesUsed
     }}>
       {children}
     </AuthContext.Provider>
