@@ -72,7 +72,8 @@ function ConsentModal({ onAccept, onDecline, noStore, setNoStore }: { onAccept: 
 }
 
 export default function ChatPage() {
-    const { user, loading: authLoading, cryptoReady } = useAuth();
+    // MODIFICARE: Adăugăm funcțiile din context
+    const { user, loading: authLoading, cryptoReady, canSendMessage, incrementMessagesUsed, getMessagesRemaining } = useAuth();
     const router = useRouter();
     const [hasConsented, setHasConsented] = useState(false);
     const [noStore, setNoStore] = useState(false);
@@ -140,13 +141,8 @@ export default function ChatPage() {
                 const decryptedMessages = await Promise.all(
                     fetchedMessages.map(async (msg) => {
                         if (msg.contentEnc && msg.iv) {
-                            try {
-                                const decryptedContent = await decryptText(msg.contentEnc, msg.iv);
-                                return { ...msg, content: decryptedContent };
-                            } catch (e) {
-                                console.error("Failed to decrypt a message:", e);
-                                return { ...msg, content: "[Mesaj indescifrabil]" };
-                            }
+                            const decryptedContent = await decryptText(msg.contentEnc, msg.iv);
+                            return { ...msg, content: decryptedContent };
                         }
                         return msg;
                     })
@@ -186,6 +182,12 @@ export default function ChatPage() {
     };
 
     async function sendMessage(text: string) {
+        // MODIFICARE CHEIE 1: Verificăm dacă utilizatorul poate trimite mesaje
+        if (!canSendMessage()) {
+            setError('Ai atins limita de mesaje pentru această lună. Treci la un plan superior pentru a continua.');
+            return;
+        }
+
         if (!text.trim() || isLoading || !user) return;
         if (!hasConsented) {
             setError('Trebuie să accepți termenii pentru a continua.');
@@ -215,6 +217,11 @@ export default function ChatPage() {
             });
 
             if (!res.ok || !res.body) throw new Error('A apărut o eroare la server. Încearcă din nou.');
+            
+            // MODIFICARE CHEIE 2: Incrementăm contorul după succes
+            if (!noStore) {
+                await incrementMessagesUsed();
+            }
 
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
@@ -399,6 +406,8 @@ export default function ChatPage() {
                             <span>Mod privat (nu salva)</span>
                         </label>
                         <p className="text-[11px] text-gray-500 mt-1">Nu înlocuiește un psiholog. În criză, sună la 112.</p>
+                        {/* MODIFICARE: Afișăm mesajele rămase */}
+                        {!noStore && <p className="text-xs text-gray-600 mt-2 font-medium">Mesaje rămase luna aceasta: {getMessagesRemaining()}</p>}
                     </div>
                     <div className="flex-grow overflow-y-auto pr-2">
                         <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2"><HistoryIcon /> Istoric</h2>
@@ -441,8 +450,8 @@ export default function ChatPage() {
                     </div>
                     <div className="p-4 md:p-6 bg-white border-t">
                         <form id="chatForm" onSubmit={handleSubmit} className="flex items-center space-x-2 md:space-x-4">
-                            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Scrie mesajul tău aici..." className="w-full p-3 md:p-4 border rounded-full bg-white text-black placeholder-gray-500 focus:ring-2 focus:ring-primary transition-shadow" disabled={isLoading} />
-                            <button type="submit" className="bg-primary p-3 md:p-4 rounded-full text-white hover:bg-opacity-90 transition-colors disabled:bg-gray-400" disabled={isLoading || !input.trim()} aria-label="Trimite mesaj">
+                            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={canSendMessage() ? "Scrie mesajul tău aici..." : "Ai atins limita de mesaje."} className="w-full p-3 md:p-4 border rounded-full bg-white text-black placeholder-gray-500 focus:ring-2 focus:ring-primary transition-shadow" disabled={isLoading || !canSendMessage()} />
+                            <button type="submit" className="bg-primary p-3 md:p-4 rounded-full text-white hover:bg-opacity-90 transition-colors disabled:bg-gray-400" disabled={isLoading || !input.trim() || !canSendMessage()} aria-label="Trimite mesaj">
                                 <SendIcon />
                             </button>
                         </form>
