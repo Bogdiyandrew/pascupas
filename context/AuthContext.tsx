@@ -5,10 +5,10 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   onIdTokenChanged,
-  User 
+  User,
+  sendPasswordResetEmail // MODIFICARE: Importăm funcția de resetare
 } from 'firebase/auth';
-// MODIFICARE: Importăm onSnapshot pentru a asculta modificări în timp real
-import { doc, getDoc, setDoc, updateDoc, Timestamp, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { initializeChatCrypto, clearChatCrypto } from '@/lib/cryptoChat';
 import { FirebaseUser, PLANS, canSendMessage, getMessagesRemaining } from '@/types/subscription';
@@ -20,6 +20,7 @@ interface AuthContextType {
   cryptoReady: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>; // MODIFICARE: Adăugăm noua funcție
   
   canSendMessage: () => boolean;
   getMessagesRemaining: () => number;
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [cryptoReady, setCryptoReady] = useState(false);
 
+  // ... (initializeNewUser și signIn rămân neschimbate)
   const initializeNewUser = async (firebaseUser: User): Promise<FirebaseUser> => {
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -50,7 +52,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     await setDoc(doc(db, 'users', firebaseUser.uid), newUserDoc);
-    console.log('✅ Utilizator nou inițializat cu planul gratuit.');
     return newUserDoc;
   };
   
@@ -61,15 +62,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await signOut(auth);
   };
+  
+  // MODIFICARE: Adăugăm funcția pentru resetarea parolei
+  const sendPasswordReset = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      console.error("Eroare la trimiterea emailului de resetare:", error);
+      throw error; // Aruncăm eroarea pentru a fi prinsă în AuthModal
+    }
+  };
 
   useEffect(() => {
+    // ... (useEffect rămâne neschimbat)
     let unsubscribeFromFirestore: (() => void) | null = null;
 
     const unsubscribeFromAuth = onIdTokenChanged(auth, async (firebaseUser) => {
-      // Dacă există un listener activ de la un user anterior, îl oprim
-      if (unsubscribeFromFirestore) {
-        unsubscribeFromFirestore();
-      }
+      if (unsubscribeFromFirestore) unsubscribeFromFirestore();
 
       if (firebaseUser) {
         setLoading(true);
@@ -81,37 +90,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           
-          // --- MODIFICARE CHEIE: Implementăm listener-ul onSnapshot ---
           unsubscribeFromFirestore = onSnapshot(userDocRef, async (docSnap) => {
             if (docSnap.exists()) {
               let userData = docSnap.data() as FirebaseUser;
-              console.log('📄 Document utilizator (re)încărcat în timp real.');
-              
               const expectedLimit = PLANS[userData.currentPlan]?.messagesLimit ?? PLANS.free.messagesLimit;
               let needsUpdate = false;
               const updates: Partial<FirebaseUser> = {};
 
-              // --- LOGICA DE AUTO-CORECTIE ---
               if (userData.messagesLimit !== expectedLimit) {
                 updates.messagesLimit = expectedLimit;
                 needsUpdate = true;
-                console.log(`🔧 Limita de mesaje nu corespunde planului. Se actualizează la: ${expectedLimit}`);
               }
 
-              // Verificăm și resetăm luna, dacă este cazul
               const now = new Date();
               if (now >= userData.resetDate.toDate()) {
                   updates.messagesThisMonth = 0;
                   updates.resetDate = Timestamp.fromDate(new Date(now.getFullYear(), now.getMonth() + 1, 1));
                   needsUpdate = true;
-                  console.log('🔄 Resetez mesajele pentru luna nouă...');
               }
 
               if (needsUpdate) {
-                // Actualizăm documentul, iar onSnapshot va prelua automat modificarea
                 await updateDoc(userDocRef, updates);
               } else {
-                // Dacă nu e nevoie de update, setăm direct starea
                 setUserDoc(userData);
               }
 
@@ -128,7 +128,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
       } else {
-        // Când nu există utilizator, curățăm tot
         clearChatCrypto();
         setCryptoReady(false);
         setUser(null);
@@ -137,12 +136,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // Funcția de curățare la demontarea componentei
     return () => {
       unsubscribeFromAuth();
-      if (unsubscribeFromFirestore) {
-        unsubscribeFromFirestore();
-      }
+      if (unsubscribeFromFirestore) unsubscribeFromFirestore();
     };
   }, []);
 
@@ -150,17 +146,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user || !userDoc) return;
     const newCount = userDoc.messagesThisMonth + 1;
     await updateDoc(doc(db, 'users', user.uid), { messagesThisMonth: newCount });
-    // Nu mai este nevoie să actualizăm starea locală, onSnapshot se ocupă
   };
 
   const canSendMessageCheck = (): boolean => {
-    if (!userDoc) return false;
-    return canSendMessage(userDoc.messagesThisMonth, userDoc.messagesLimit);
+    return userDoc ? canSendMessage(userDoc.messagesThisMonth, userDoc.messagesLimit) : false;
   };
 
   const getMessagesRemainingCount = (): number => {
-    if (!userDoc) return 0;
-    return getMessagesRemaining(userDoc.messagesThisMonth, userDoc.messagesLimit);
+    return userDoc ? getMessagesRemaining(userDoc.messagesThisMonth, userDoc.messagesLimit) : 0;
   };
 
   const getCurrentPlan = (): string => {
@@ -175,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cryptoReady,
       signIn,
       logout,
+      sendPasswordReset, // MODIFICARE: Expunem funcția prin context
       canSendMessage: canSendMessageCheck,
       getMessagesRemaining: getMessagesRemainingCount,
       getCurrentPlan,

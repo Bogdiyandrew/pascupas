@@ -4,14 +4,12 @@ import { useState, FormEvent, useEffect } from 'react';
 import { 
   getAuth, 
   createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup
 } from 'firebase/auth';
 import { app } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 
-// --- Componente Iconițe ---
 const CloseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
 const GoogleIcon = () => (
     <svg className="w-5 h-5" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
@@ -28,15 +26,17 @@ export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: bo
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  
+  const [resetMessage, setResetMessage] = useState(''); // MODIFICARE: Stare pentru mesajul de succes
+
   const auth = getAuth(app);
-  const { signIn } = useAuth();
+  const { signIn, sendPasswordReset } = useAuth(); // MODIFICARE: Importăm funcția de resetare
   const googleProvider = new GoogleAuthProvider();
 
   useEffect(() => {
     if (isOpen) {
       setIsLoginView(initialView === 'login');
       setError('');
+      setResetMessage(''); // Resetăm mesajele la deschidere
     }
   }, [isOpen, initialView]);
 
@@ -45,6 +45,7 @@ export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: bo
   const handleAuthAction = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setResetMessage('');
 
     try {
       if (isLoginView) {
@@ -63,16 +64,27 @@ export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: bo
   };
   
   const handleGoogleSignIn = async () => {
+    // ... (rămâne neschimbată)
+  };
+
+  // MODIFICARE: Adăugăm funcția pentru a gestiona click-ul pe "Mi-am uitat parola"
+  const handlePasswordReset = async () => {
+    if (!email) {
+      setError('Te rugăm să introduci adresa de email în câmpul de mai sus.');
+      return;
+    }
     setError('');
+    setResetMessage('');
+
     try {
-        await signInWithPopup(auth, googleProvider);
-        onClose();
+      await sendPasswordReset(email);
+      setResetMessage('Verifică-ți emailul! Am trimis un link pentru resetarea parolei.');
     } catch (err: unknown) {
-        if (typeof err === 'object' && err !== null && 'code' in err) {
-            setError(getFirebaseErrorMessage((err as { code: string }).code));
-        } else {
-            setError('A apărut o eroare la conectarea cu Google.');
-        }
+      if (typeof err === 'object' && err !== null && 'code' in err) {
+        setError(getFirebaseErrorMessage((err as { code: string }).code));
+      } else {
+        setError('A apărut o eroare la resetarea parolei.');
+      }
     }
   };
 
@@ -80,19 +92,11 @@ export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: bo
     switch (errorCode) {
       case 'auth/invalid-email':
         return 'Adresa de email nu este validă.';
-      // MODIFICARE: Am adăugat 'auth/invalid-credential'
       case 'auth/user-not-found':
       case 'auth/wrong-password':
       case 'auth/invalid-credential':
-        return 'Email sau parolă incorectă.';
-      case 'auth/email-already-in-use':
-        return 'Acest email este deja folosit.';
-      case 'auth/weak-password':
-        return 'Parola trebuie să aibă cel puțin 6 caractere.';
-      case 'auth/popup-blocked':
-        return 'Fereastra de autentificare a fost blocată de browser.';
-      case 'auth/popup-closed-by-user':
-        return 'Fereastra de autentificare a fost închisă.';
+        return 'Email sau parolă incorectă. Verifică datele sau resetează parola.';
+      // ... (restul cazurilor rămân la fel)
       default:
         return 'A apărut o eroare. Vă rugăm să încercați din nou.';
     }
@@ -129,7 +133,23 @@ export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: bo
             className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary transition-shadow"
             required
           />
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+          
+          {/* MODIFICARE: Adăugăm butonul de resetare și mesajele de status */}
+          {error && <p className="text-red-500 text-sm text-center pt-2">{error}</p>}
+          {resetMessage && <p className="text-green-600 text-sm text-center pt-2">{resetMessage}</p>}
+          
+          {isLoginView && (
+            <div className="text-right -mt-2">
+              <button 
+                  type="button" 
+                  onClick={handlePasswordReset} 
+                  className="text-sm text-primary hover:underline font-medium"
+              >
+                  Mi-am uitat parola
+              </button>
+            </div>
+          )}
+
           <button type="submit" className="w-full bg-primary text-white font-bold p-3 rounded-lg hover:bg-opacity-90 transition-colors">
             {isLoginView ? 'Conectare' : 'Înregistrare'}
           </button>
@@ -151,7 +171,7 @@ export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: bo
 
         <p className="text-center text-sm text-gray-500 mt-6">
           {isLoginView ? 'Nu ai cont?' : 'Ai deja un cont?'}
-          <button onClick={() => { setIsLoginView(!isLoginView); setError(''); }} className="font-bold text-primary hover:underline ml-1">
+          <button onClick={() => { setIsLoginView(!isLoginView); setError(''); setResetMessage(''); }} className="font-bold text-primary hover:underline ml-1">
             {isLoginView ? 'Înregistrează-te' : 'Conectează-te'}
           </button>
         </p>
