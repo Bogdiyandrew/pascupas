@@ -38,3 +38,5 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 
 de facut un text ca toate mesajele sunt criptate
+
+de facut cookies
