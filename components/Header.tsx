@@ -1,8 +1,7 @@
-'use client'; // <-- MODIFICAREA CHEIE
+'use client'; 
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { getAuth, signOut } from 'firebase/auth';
 import { useAuth } from '@/context/AuthContext';
 import AuthModal from './AuthModal';
 import { useRouter } from 'next/navigation';
@@ -21,8 +20,12 @@ const CloseIcon = () => (
 
 const CreditCardIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-    </svg>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+);
+
+// Noua pictogramă pentru contul meu
+const UserIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
 );
 
 export default function Header() {
@@ -87,6 +90,10 @@ export default function Header() {
                     </span>
                   )}
                 </Link>
+                <Link href="/contul-meu" className="flex items-center gap-1 font-bold text-text hover:text-primary transition-colors">
+                  <UserIcon />
+                  Contul meu
+                </Link>
                 <button onClick={handleLogout} className="bg-primary text-white px-5 py-2 rounded-lg font-bold hover:bg-opacity-90 transition-colors">
                   Deconectare
                 </button>
@@ -134,6 +141,10 @@ export default function Header() {
                               Upgrade
                             </span>
                           )}
+                        </Link>
+                        <Link href="/contul-meu" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 font-bold text-text hover:text-primary transition-colors text-lg">
+                          <UserIcon />
+                          Contul meu
                         </Link>
                         <button onClick={handleLogout} className="bg-primary text-white w-full max-w-xs px-5 py-3 rounded-lg font-bold hover:bg-opacity-90 transition-colors text-lg">
                           Deconectare

@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
 import Header from '@/components/Header';
+import { useAuth } from '@/context/AuthContext';
+import { getMessagesRemaining, PLANS } from '@/types/subscription';
+import { deleteUser } from 'firebase/auth'; // Importăm funcția deleteUser
 
 // --- Iconițe ---
 const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
@@ -41,8 +43,13 @@ export default function AccountPage() {
   };
 
   const handleManageSubscription = () => {
-    // Aici va veni logica de redirectare către portalul de plăți (ex: Stripe)
-    alert('Funcționalitatea de gestionare a abonamentului va fi disponibilă în curând!');
+    // Redirecționăm utilizatorul la pagina cu planuri pentru a alege un alt abonament
+    router.push('/planuri');
+  };
+
+  const handleDeleteAccount = () => {
+    // TODO: Implement a proper account deletion flow with confirmation and Firebase deletion.
+    alert('Funcționalitatea de ștergere a contului va fi disponibilă în curând!');
   };
 
   // Stare de încărcare generală
@@ -99,7 +106,6 @@ export default function AccountPage() {
             <div className="space-y-4">
               <button 
                 onClick={handleManageSubscription} 
-                disabled={currentPlan === 'free'} 
                 className="w-full md:w-auto flex items-center gap-2 px-4 py-2 border rounded-lg font-medium text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <CreditCardIcon /> Gestionează Abonamentul
@@ -119,8 +125,8 @@ export default function AccountPage() {
                <button onClick={logout} className="w-full md:w-auto flex items-center gap-2 px-4 py-2 border rounded-lg font-medium text-sm text-red-600 hover:bg-red-50">
                   <LogoutIcon /> Deconectare
               </button>
-               <button disabled className="w-full md:w-auto flex items-center gap-2 px-4 py-2 border rounded-lg font-medium text-sm text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed">
-                  <TrashIcon /> Șterge Contul (în curând)
+               <button onClick={handleDeleteAccount} className="w-full md:w-auto flex items-center gap-2 px-4 py-2 border rounded-lg font-medium text-sm text-red-600 hover:bg-red-50">
+                  <TrashIcon /> Șterge Contul
               </button>
             </div>
           </div>
@@ -130,16 +136,3 @@ export default function AccountPage() {
     </>
   );
 }
-
-// Funcție ajutătoare refolosită din /planuri
-const getMessagesRemaining = (used: number, limit: number) => {
-  if (limit === -1) return -1;
-  return Math.max(0, limit - used);
-};
-
-// Obiect PLANS refolosit din /planuri pentru afișarea numelui
-const PLANS = {
-  free: { name: 'Gratuit' },
-  premium_monthly: { name: 'Premium Lunar' },
-  premium_annual: { name: 'Premium Anual' },
-};

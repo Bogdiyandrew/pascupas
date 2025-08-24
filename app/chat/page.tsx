@@ -1,3 +1,4 @@
+// app/chat/page.tsx
 'use client';
 
 import { useState, useRef, useEffect, FormEvent, useCallback } from 'react';
@@ -44,6 +45,7 @@ const EditIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 
 const DeleteIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> );
 const MenuIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg> );
 const LockIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a4 4 0 100 8 4 4 0 000-8z" clipRule="evenodd" /></svg> );
+const PrivacyIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>);
 
 const startSuggestions = [ 'Vreau să vorbesc despre stres', 'Mă simt trist/ă', 'Am nevoie de un sfat', 'Nu pot dormi bine', 'Mă simt anxios/anxioasă', ];
 
@@ -71,6 +73,13 @@ function ConsentModal({ onAccept, onDecline, noStore, setNoStore }: { onAccept: 
         </div>
     );
 }
+
+const PrivateModeIndicator = () => (
+    <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 p-2 rounded-md bg-yellow-100 border border-yellow-300">
+        <PrivacyIcon />
+        <span>Mod privat activ. Această conversație nu va fi salvată.</span>
+    </div>
+);
 
 export default function ChatPage() {
     const { user, loading: authLoading, cryptoReady, canSendMessage, incrementMessagesUsed, getMessagesRemaining } = useAuth();
@@ -424,6 +433,7 @@ export default function ChatPage() {
                         )}
                     </div>
                     <div className="p-4 md:p-6 bg-white border-t">
+                        {noStore && <PrivateModeIndicator />}
                         <form id="chatForm" onSubmit={handleSubmit} className="flex items-center space-x-2 md:space-x-4">
                             <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={canSendMessage() ? "Scrie mesajul tău aici..." : "Ai atins limita de mesaje."} className="w-full p-3 md:p-4 border rounded-full bg-white text-black placeholder-gray-500 focus:ring-2 focus:ring-primary transition-shadow" disabled={isLoading || !canSendMessage()} />
                             <button type="submit" className="bg-primary p-3 md:p-4 rounded-full text-white hover:bg-opacity-90 transition-colors disabled:bg-gray-400" disabled={isLoading || !input.trim() || !canSendMessage()} aria-label="Trimite mesaj">
