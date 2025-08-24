@@ -43,6 +43,7 @@ const OptionsIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h
 const EditIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg> );
 const DeleteIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> );
 const MenuIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg> );
+const LockIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a4 4 0 100 8 4 4 0 000-8z" clipRule="evenodd" /></svg> );
 
 const startSuggestions = [ 'Vreau să vorbesc despre stres', 'Mă simt trist/ă', 'Am nevoie de un sfat', 'Nu pot dormi bine', 'Mă simt anxios/anxioasă', ];
 
@@ -363,16 +364,15 @@ export default function ChatPage() {
         );
     }
 
-    // MODIFICARE: Calculăm valoarea de afișat aici
     const remainingMessages = getMessagesRemaining();
-    const displayRemaining = remainingMessages === -1 ? 'Nelimitat' : remainingMessages;
+    const displayRemaining = remainingMessages === -1 || remainingMessages === Infinity ? 'Nelimitat' : remainingMessages;
 
     return (
         <>
             <Header />
             <div className="flex h-[calc(100vh-88px)] relative overflow-hidden">
                 {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-20 md:hidden"></div>}
-                <aside className={`absolute top-0 left-0 h-full w-3/4 max-w-xs md:w-1/4 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out bg-background border-r border-gray-200 p-6 flex flex-col z-30`}>
+                <aside className={`absolute top-0 left-0 h-full w-3-4 max-w-xs md:w-1/4 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out bg-background border-r border-gray-200 p-6 flex flex-col z-30`}>
                     <button onClick={startNewConversation} className="flex items-center justify-center gap-2 w-full bg-primary text-white font-bold p-3 rounded-lg hover:bg-opacity-90 transition-colors mb-4">
                         <PlusIcon /> Conversație Nouă
                     </button>
@@ -382,7 +382,6 @@ export default function ChatPage() {
                             <span>Mod privat (nu salva)</span>
                         </label>
                         <p className="text-[11px] text-gray-500 mt-1">Nu înlocuiește un psiholog. În criză, sună la 112.</p>
-                        {/* MODIFICARE: Folosim valoarea calculată */}
                         <p className="text-xs text-gray-600 mt-2 font-medium">Mesaje rămase luna aceasta: {displayRemaining}</p>
                     </div>
                     <div className="flex-grow overflow-y-auto pr-2">
@@ -432,6 +431,18 @@ export default function ChatPage() {
                             </button>
                         </form>
                         {error && <p className="text-red-500 text-sm text-center mt-2">{error}</p>}
+                        
+                        <div className="text-center text-xs text-gray-400 mt-4 px-4">
+                           {!noStore && (
+                             <p className="flex items-center justify-center gap-1.5 mb-1">
+                                <LockIcon />
+                                <span>Toate conversațiile sunt criptate end-to-end.</span>
+                            </p>
+                           )}
+                            <p>
+                                PascuPas poate face greșeli. Verifică informațiile importante.
+                            </p>
+                        </div>
                     </div>
                 </main>
             </div>
