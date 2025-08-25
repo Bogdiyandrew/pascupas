@@ -1,6 +1,5 @@
 import Stripe from 'stripe';
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/firebase';
 import { isPlanType, PLANS, PlanType } from '@/types/subscription';
 
 // Inițializează Stripe cu cheia secretă din variabilele de mediu.
@@ -18,7 +17,7 @@ const planToPriceId: Record<PlanType, string | null> = {
 export async function POST(req: NextRequest) {
   const { planId, userId, userEmail } = await req.json();
 
-  // DEBUG: Loghează valoarea variabilei de mediu pentru a o verifica în log-urile de pe Vercel.
+  // DEBUG: Loghează valoarea variabileai de mediu pentru a o verifica în log-urile de pe Vercel.
   console.log('Valoarea NEXT_PUBLIC_APP_URL este:', process.env.NEXT_PUBLIC_APP_URL);
 
   if (!planId || !userId || !userEmail) {
@@ -42,16 +41,9 @@ export async function POST(req: NextRequest) {
         return new NextResponse('Eroare la crearea sesiunii de plată: URL-ul aplicației nu este configurat.', { status: 500 });
     }
 
-    // Funcție utilitară pentru a asigura că URL-ul are un prefix HTTPS valid.
-    const ensureHttps = (url: string) => {
-        if (url.startsWith('http://') || url.startsWith('https://')) {
-            return url;
-        }
-        return `https://${url}`;
-    };
-
-    // Curăță URL-ul și asigură-te că are prefixul https://
-    const cleanedUrl = ensureHttps(appUrl).endsWith('/') ? ensureHttps(appUrl).slice(0, -1) : ensureHttps(appUrl);
+    // Aici am simplificat logica. Verificăm dacă URL-ul are deja protocol și-l adăugăm dacă nu.
+    // De asemenea, am eliminat slash-ul de la final, pentru a nu avea dublură în URL-uri.
+    const baseUrl = appUrl.startsWith('http') ? appUrl.replace(/\/+$/, '') : `https://${appUrl}`.replace(/\/+$/, '');
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -62,8 +54,8 @@ export async function POST(req: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${cleanedUrl}/planuri?success=true`,
-      cancel_url: `${cleanedUrl}/planuri?canceled=true`,
+      success_url: `${baseUrl}/planuri?success=true`,
+      cancel_url: `${baseUrl}/planuri?canceled=true`,
       customer_email: userEmail,
       metadata: {
         userId: userId,
