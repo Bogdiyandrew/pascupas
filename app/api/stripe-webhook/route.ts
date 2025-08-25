@@ -1,9 +1,8 @@
 import Stripe from 'stripe';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { PlanType, PLANS } from '@/types/subscription';
 import { Timestamp } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin'; // NOU: importă Admin SDK
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-07-30.basil',
@@ -54,17 +53,17 @@ export async function POST(req: NextRequest) {
 
         try {
           if (typeof userId === 'string' && typeof planId === 'string' && PLANS[planId as PlanType]) {
-            const userRef = doc(db, 'users', userId);
+            const userRef = adminDb.collection('users').doc(userId);
             
-            const userDoc = await getDoc(userRef);
-            if(userDoc.exists()) {
+            const userDoc = await userRef.get();
+            if(userDoc.exists) {
               console.log('[STRIPE_WEBHOOK] Starea curentă a documentului Firestore:', userDoc.data());
             }
 
             const now = new Date();
             const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
             
-            await updateDoc(userRef, {
+            await userRef.update({
               currentPlan: planId as PlanType,
               stripeSubscriptionId: subscriptionId,
               stripeCustomerId: session.customer as string,
