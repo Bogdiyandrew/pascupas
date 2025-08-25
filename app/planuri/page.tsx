@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react'; // Am adăugat useEffect
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
 import { PLANS, PlanType } from '@/types/subscription';
@@ -11,21 +11,24 @@ const CrownIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-6
 const CheckIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> );
 const ArrowLeftIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg> );
 const CreditCardIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg> );
+const SuccessIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>);
+const ErrorIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>);
 
 interface PlanCardProps {
   planType: PlanType;
   isCurrentPlan: boolean;
   onUpgrade: (plan: PlanType) => void;
   isPopular?: boolean;
+  isUpgrading: boolean;
 }
 
-function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular }: PlanCardProps) {
+function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular, isUpgrading }: PlanCardProps) {
   const plan = PLANS[planType];
   const isPremium = planType !== 'free';
   const isAnnual = planType === 'premium_annual';
   
   return (
-    <div className={`relative rounded-2xl border-2 p-6 transition-all hover:shadow-lg ${
+    <div className={`relative rounded-2xl border-2 p-6 flex flex-col transition-all hover:shadow-lg ${
       isPopular 
         ? 'border-yellow-400 bg-gradient-to-br from-yellow-50 to-yellow-100 shadow-lg scale-105' 
         : isCurrentPlan 
@@ -49,7 +52,7 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular }: PlanCardPro
         </div>
       )}
 
-      <div className="text-center pt-2">
+      <div className="text-center pt-2 flex-grow">
         <div className="flex items-center justify-center gap-2 mb-2">
           {isPremium && <CrownIcon />}
           <h3 className={`text-xl font-bold ${isPremium ? 'text-yellow-700' : 'text-gray-700'}`}>
@@ -87,19 +90,21 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular }: PlanCardPro
             </li>
           ))}
         </ul>
+      </div>
 
+      <div className="mt-auto">
         <button
           onClick={() => onUpgrade(planType)}
-          disabled={isCurrentPlan}
+          disabled={isCurrentPlan || isUpgrading}
           className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-            isCurrentPlan
+            isCurrentPlan || isUpgrading
               ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
               : isPremium
               ? 'bg-gradient-to-r from-yellow-400 to-orange-400 text-white hover:from-yellow-500 hover:to-orange-500 shadow-md'
               : 'bg-gray-800 text-white hover:bg-gray-900'
           }`}
         >
-          {isCurrentPlan 
+          {isUpgrading ? 'Procesare...' : isCurrentPlan 
             ? 'Planul curent' 
             : planType === 'free' 
             ? 'Schimbă la Gratuit' 
@@ -113,42 +118,66 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular }: PlanCardPro
 
 export default function PlanuriPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, userDoc, loading } = useAuth();
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [stripeMessage, setStripeMessage] = useState<string | null>(null);
 
-  // --- MODIFICARE CHEIE: Adăugăm useEffect pentru a gestiona redirecționarea ---
   useEffect(() => {
-    // Așteptăm să se termine încărcarea
     if (!loading) {
-      // Dacă încărcarea s-a terminat și NU există un utilizator, redirecționăm
       if (!user) {
-        console.log("Utilizator neautentificat. Redirecționare către pagina principală.");
         router.push('/');
       }
     }
-  }, [user, loading, router]); // Dependințe pentru a rula efectul la schimbarea lor
-  // --------------------------------------------------------------------------
+  }, [user, loading, router]);
+
+  useEffect(() => {
+    // Verificăm parametrii URL-ului pentru mesaje de la Stripe
+    const success = searchParams.get('success');
+    const canceled = searchParams.get('canceled');
+
+    if (success) {
+      setStripeMessage('Plata a fost procesată cu succes! Planul tău va fi actualizat în curând.');
+    } else if (canceled) {
+      setStripeMessage('Plata a fost anulată. Te poți abona oricând dorești.');
+    }
+  }, [searchParams]);
 
   const handleUpgrade = async (planType: PlanType) => {
-    if (!user || !userDoc) return;
+    if (!user || !userDoc || planType === 'free' || isUpgrading) return;
     
     setIsUpgrading(true);
+    setStripeMessage(null);
     
     try {
-      if (planType === 'free') {
-        alert('În curând vei putea schimba la planul gratuit.');
+      const res = await fetch('/api/checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          planId: planType,
+          userId: user.uid,
+          userEmail: user.email,
+        }),
+      });
+
+      const { url } = await res.json();
+      
+      if (url) {
+        router.push(url);
       } else {
-        alert(`În curând vei putea face upgrade la ${PLANS[planType].name}. Integrarea cu plățile vine în curând!`);
+        throw new Error('Nu s-a putut obține URL-ul de checkout.');
       }
+
     } catch (error) {
-      console.error('Eroare la schimbarea planului:', error);
-      alert('A apărut o eroare. Te rog încearcă din nou.');
+      console.error('Eroare la crearea sesiunii de plată:', error);
+      setStripeMessage('A apărut o eroare la procesarea plății. Te rog încearcă din nou.');
     } finally {
       setIsUpgrading(false);
     }
   };
 
-  // --- MODIFICARE: Afișăm starea de încărcare doar cât timp `loading` este true sau până la redirecționare ---
   if (loading || !user || !userDoc) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -156,7 +185,6 @@ export default function PlanuriPage() {
       </div>
     );
   }
-  // --------------------------------------------------------------------------------
 
   const currentPlan = userDoc.currentPlan;
   const remaining = userDoc.messagesLimit === -1 ? -1 : userDoc.messagesLimit - userDoc.messagesThisMonth;
@@ -180,6 +208,16 @@ export default function PlanuriPage() {
               <p className="text-gray-600 mt-1">Alege planul potrivit pentru nevoile tale</p>
             </div>
           </div>
+
+          {/* Mesaje de status de la Stripe */}
+          {stripeMessage && (
+            <div className={`flex items-center gap-2 p-4 rounded-lg mb-6 ${
+                stripeMessage.includes('succes') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            }`}>
+              {stripeMessage.includes('succes') ? <SuccessIcon /> : <ErrorIcon />}
+              <span className="text-sm font-medium">{stripeMessage}</span>
+            </div>
+          )}
 
           {/* Current Plan Status */}
           <div className="bg-white rounded-2xl shadow-sm border p-6 mb-8">
@@ -240,12 +278,14 @@ export default function PlanuriPage() {
                 planType="free"
                 isCurrentPlan={currentPlan === 'free'}
                 onUpgrade={handleUpgrade}
+                isUpgrading={isUpgrading}
               />
               
               <PlanCard
                 planType="premium_monthly"
                 isCurrentPlan={currentPlan === 'premium_monthly'}
                 onUpgrade={handleUpgrade}
+                isUpgrading={isUpgrading}
               />
               
               <PlanCard
@@ -253,6 +293,7 @@ export default function PlanuriPage() {
                 isCurrentPlan={currentPlan === 'premium_annual'}
                 onUpgrade={handleUpgrade}
                 isPopular={true}
+                isUpgrading={isUpgrading}
               />
             </div>
           </div>
@@ -281,3 +322,8 @@ export default function PlanuriPage() {
     </>
   );
 }
+
+const getMessagesRemaining = (used: number, limit: number) => {
+  if (limit === -1) return -1;
+  return Math.max(0, limit - used);
+};

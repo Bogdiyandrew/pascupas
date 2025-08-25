@@ -47,3 +47,7 @@ export function getMessagesRemaining(messagesUsed: number, limit: number): numbe
   if (limit === -1) return -1; // unlimited
   return Math.max(0, limit - messagesUsed);
 }
+
+export function isPlanType(plan: any): plan is PlanType {
+    return typeof plan === 'string' && Object.keys(PLANS).includes(plan);
+}

@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
 import { getMessagesRemaining, PLANS } from '@/types/subscription';
-import { deleteUser } from 'firebase/auth'; // Importăm funcția deleteUser
+import { collection, query, where, getDocs, deleteDoc, doc, deleteField, updateDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+import { deleteUser } from 'firebase/auth';
 
 // --- Iconițe ---
 const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
@@ -13,12 +15,33 @@ const CreditCardIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="
 const KeyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1119 7z" /></svg>;
 const LogoutIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>;
 const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
+const AlertIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
+
+function DeleteAccountModal({ onConfirm, onCancel, isLoading }: { onConfirm: () => void; onCancel: () => void; isLoading: boolean }) {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm mx-4">
+                <div className="flex justify-center mb-4"><AlertIcon /></div>
+                <h3 className="font-bold text-lg text-center">Ești sigur?</h3>
+                <p className="text-center text-gray-600 mt-2 text-sm">Această acțiune este ireversibilă. Toate conversațiile și datele tale vor fi șterse definitiv.</p>
+                <div className="flex justify-center gap-4 mt-6">
+                    <button onClick={onCancel} className="px-6 py-2 rounded-lg border">Anulează</button>
+                    <button onClick={onConfirm} disabled={isLoading} className={`px-6 py-2 rounded-lg text-white ${isLoading ? 'bg-red-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}>
+                        {isLoading ? 'Șterge...' : 'Șterge Contul'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export default function AccountPage() {
   const { user, userDoc, loading, logout, sendPasswordReset } = useAuth();
   const router = useRouter();
   const [resetMessage, setResetMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Protejăm ruta: dacă nu există utilizator după încărcare, redirecționăm
   useEffect(() => {
@@ -43,13 +66,39 @@ export default function AccountPage() {
   };
 
   const handleManageSubscription = () => {
-    // Redirecționăm utilizatorul la pagina cu planuri pentru a alege un alt abonament
     router.push('/planuri');
   };
 
   const handleDeleteAccount = () => {
-    // TODO: Implement a proper account deletion flow with confirmation and Firebase deletion.
-    alert('Funcționalitatea de ștergere a contului va fi disponibilă în curând!');
+    setShowDeleteModal(true);
+  };
+  
+  const confirmDelete = async () => {
+    if (!user) return;
+
+    setIsDeleting(true);
+    try {
+        // 1. Șterge toate conversațiile asociate cu utilizatorul
+        const conversationsQuery = query(collection(db, 'conversations'), where('userId', '==', user.uid));
+        const querySnapshot = await getDocs(conversationsQuery);
+        const deletionPromises = querySnapshot.docs.map(d => deleteDoc(d.ref));
+        await Promise.all(deletionPromises);
+
+        // 2. Șterge documentul utilizatorului din Firestore
+        const userDocRef = doc(db, 'users', user.uid);
+        await deleteDoc(userDocRef);
+
+        // 3. Șterge utilizatorul din Firebase Auth
+        await deleteUser(user);
+
+        // 4. Redirecționează utilizatorul după ștergere
+        router.push('/');
+    } catch (error) {
+        console.error("Eroare la ștergerea contului:", error);
+        setErrorMessage('A apărut o eroare la ștergerea contului. Te rog încearcă din nou.');
+        setIsDeleting(false);
+        setShowDeleteModal(false);
+    }
   };
 
   // Stare de încărcare generală
@@ -133,6 +182,9 @@ export default function AccountPage() {
 
         </div>
       </div>
+      {showDeleteModal && (
+          <DeleteAccountModal onConfirm={confirmDelete} onCancel={() => setShowDeleteModal(false)} isLoading={isDeleting} />
+      )}
     </>
   );
 }
