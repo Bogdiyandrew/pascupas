@@ -1,71 +1,110 @@
 import Stripe from 'stripe';
 import { NextRequest, NextResponse } from 'next/server';
-import { isPlanType, PLANS, PlanType } from '@/types/subscription';
+import { db } from '@/lib/firebase';
+import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+import { PlanType, PLANS } from '@/types/subscription';
+import { Timestamp } from 'firebase/firestore';
 
-// Inițializează Stripe cu cheia secretă din variabilele de mediu.
+// Inițializează Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-07-30.basil',
 });
 
-// Asociază tipurile de plan cu ID-urile de preț de la Stripe.
-const planToPriceId: Record<PlanType, string | null> = {
-  free: null,
-  premium_monthly: process.env.STRIPE_PRICE_ID_MONTHLY!,
-  premium_annual: process.env.STRIPE_PRICE_ID_ANNUAL!,
-};
+// Important: În Next.js App Router, body-parser este dezactivat implicit
+// pentru rutele API, ceea ce e necesar pentru Stripe Webhooks. Nu e nevoie
+// de `export const config = { api: { bodyParser: false }}`.
 
 export async function POST(req: NextRequest) {
-  const { planId, userId, userEmail } = await req.json();
+  let event: Stripe.Event;
 
-  // DEBUG: Loghează valoarea variabileai de mediu pentru a o verifica în log-urile de pe Vercel.
-  console.log('Valoarea NEXT_PUBLIC_APP_URL este:', process.env.NEXT_PUBLIC_APP_URL);
+  // Obține corpul brut al cererii
+  const rawBody = await req.text();
+  const signature = req.headers.get('stripe-signature');
 
-  if (!planId || !userId || !userEmail) {
-    return new NextResponse('Lipsesc parametri necesari.', { status: 400 });
+  if (!signature) {
+    console.error('Semnătura Stripe lipsește din header.');
+    return new NextResponse('Lipsă semnătură Stripe.', { status: 400 });
   }
 
-  if (!isPlanType(planId) || planId === 'free') {
-    return new NextResponse('Plan invalid sau gratuit.', { status: 400 });
-  }
-
-  const priceId = planToPriceId[planId];
-  if (!priceId) {
-    return new NextResponse('ID de preț Stripe invalid.', { status: 400 });
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error('Variabila de mediu STRIPE_WEBHOOK_SECRET nu este setată.');
+    return new NextResponse('Cheie secretă de webhook nu este configurată.', { status: 500 });
   }
 
   try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-
-    if (!appUrl || appUrl.trim() === '') {
-        console.error('[STRIPE_CHECKOUT_ERROR] Variabila NEXT_PUBLIC_APP_URL nu este definită.');
-        return new NextResponse('Eroare la crearea sesiunii de plată: URL-ul aplicației nu este configurat.', { status: 500 });
-    }
-
-    // Aici am simplificat logica. Verificăm dacă URL-ul are deja protocol și-l adăugăm dacă nu.
-    // De asemenea, am eliminat slash-ul de la final, pentru a nu avea dublură în URL-uri.
-    const baseUrl = appUrl.startsWith('http') ? appUrl.replace(/\/+$/, '') : `https://${appUrl}`.replace(/\/+$/, '');
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      mode: 'subscription',
-      success_url: `${baseUrl}/planuri?success=true`,
-      cancel_url: `${baseUrl}/planuri?canceled=true`,
-      customer_email: userEmail,
-      metadata: {
-        userId: userId,
-        planId: planId,
-      },
-    });
-
-    return NextResponse.json({ url: session.url });
-  } catch (error: unknown) {
-    console.error('[STRIPE_CHECKOUT_ERROR]', error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Eroare internă de server.' }, { status: 500 });
+    // Construiește evenimentul Stripe pentru a verifica autenticitatea
+    event = stripe.webhooks.constructEvent(
+      rawBody,
+      signature,
+      webhookSecret
+    );
+  } catch (error: any) {
+    console.error(`[STRIPE_WEBHOOK_ERROR] Verificare semnătură eșuată:`, error.message);
+    return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
   }
+
+  // Aici procesăm evenimentele de webhook
+  switch (event.type) {
+    case 'checkout.session.completed': {
+      const session = event.data.object as Stripe.Checkout.Session;
+      console.log('[STRIPE_WEBHOOK] Eveniment checkout.session.completed primit.');
+
+      if (session.metadata?.userId && session.metadata?.planId) {
+        const { userId, planId } = session.metadata;
+        const subscriptionId = session.subscription as string;
+
+        console.log(`[STRIPE_WEBHOOK] Tentativă de a actualiza planul pentru utilizatorul ${userId} la planul ${planId}.`);
+
+        try {
+          // Asigură-te că userId este un string valid pentru referința documentului
+          if (typeof userId === 'string' && typeof planId === 'string' && PLANS[planId as PlanType]) {
+            const userRef = doc(db, 'users', userId);
+            
+            // Loghează starea curentă a utilizatorului înainte de a-l actualiza
+            const userDoc = await getDoc(userRef);
+            if(userDoc.exists()) {
+              console.log('[STRIPE_WEBHOOK] Starea curentă a documentului Firestore:', userDoc.data());
+            }
+
+            const now = new Date();
+            const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            
+            // Actualizează documentul utilizatorului în Firestore
+            await updateDoc(userRef, {
+              currentPlan: planId as PlanType, // Cheia corectă pentru `FirebaseUser`
+              stripeSubscriptionId: subscriptionId,
+              stripeCustomerId: session.customer as string,
+              messagesLimit: PLANS[planId as PlanType].messagesLimit,
+              messagesThisMonth: 0,
+              resetDate: Timestamp.fromDate(resetDate), // Folosim Timestamp din Firestore
+              planStartDate: Timestamp.fromDate(now),
+            });
+            console.log(`[STRIPE_WEBHOOK] Plan actualizat cu succes pentru utilizatorul ${userId}.`);
+          } else {
+            console.error('[STRIPE_WEBHOOK] userId sau planId din metadata sunt invalide sau planul nu există în PLANS.');
+          }
+        } catch (error) {
+          console.error('[STRIPE_WEBHOOK_UPDATE_ERROR] Eroare la actualizarea documentului Firestore:', error);
+          return new NextResponse(`Eroare la actualizarea bazei de date`, { status: 500 });
+        }
+      } else {
+        console.error('[STRIPE_WEBHOOK] Metadata-ul sesiunei de checkout lipsește (userId sau planId).');
+      }
+      break;
+    }
+    case 'customer.subscription.deleted':
+    case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription;
+        console.log(`[STRIPE_WEBHOOK] Eveniment ${event.type} primit.`);
+        // Aici poți adăuga logica pentru a anula planul sau a ajusta datele de facturare
+        // Recomand să folosești evenimentele de facturare Stripe pentru a gestiona cu precizie
+        // statusul abonamentului
+        break;
+    }
+    default:
+      console.log(`[STRIPE_WEBHOOK] Tip de eveniment neașteptat: ${event.type}.`);
+  }
+
+  return new NextResponse('Procesare webhook reușită.', { status: 200 });
 }
