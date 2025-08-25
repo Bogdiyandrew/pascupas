@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { PLANS, PlanType } from '@/types/subscription';
+import { Suspense } from 'react';
 
 // Iconițe
 const CrownIcon = () => (
@@ -340,5 +341,9 @@ function PlansPageClient() {
 
 // Export default cerut de Next.js pentru page.tsx în App Router
 export default function Page() {
-  return <PlansPageClient />;
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Se încarcă...</div>}>
+      <PlansPageClient />
+    </Suspense>
+  );
 }
