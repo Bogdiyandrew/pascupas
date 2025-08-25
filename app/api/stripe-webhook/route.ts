@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { NextRequest, NextResponse } from 'next/server';
 import { PlanType, PLANS } from '@/types/subscription';
 import { adminDb } from '@/lib/firebaseAdmin'; 
-import { Timestamp } from 'firebase-admin/firestore'; // NOU: importă Timestamp din Admin SDK
+import { Timestamp } from 'firebase-admin/firestore'; 
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-07-30.basil',
