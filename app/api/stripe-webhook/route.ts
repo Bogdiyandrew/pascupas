@@ -1,86 +1,110 @@
 import Stripe from 'stripe';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore'; // Removed setDoc as it's not used here
 import { PlanType, PLANS } from '@/types/subscription';
+import { Timestamp } from 'firebase/firestore';
 
+// Inițializează Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-07-30.basil',
 });
 
 export async function POST(req: NextRequest) {
-  const body = await req.text();
-  const signature = req.headers.get('stripe-signature') as string;
+  let event: Stripe.Event;
+
+  // Obține corpul brut al cererii
+  const rawBody = await req.text();
+  const signature = req.headers.get('stripe-signature');
 
   if (!signature) {
-    return new NextResponse('Semnătură webhook lipsă', { status: 400 });
+    console.error('Semnătura Stripe lipsește din header.');
+    return new NextResponse('Lipsă semnătură Stripe.', { status: 400 });
   }
 
-  let event: Stripe.Event;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error('Variabila de mediu STRIPE_WEBHOOK_SECRET nu este setată.');
+    return new NextResponse('Cheie secretă de webhook nu este configurată.', { status: 500 });
+  }
+
   try {
-    // Înlocuim "any" cu "unknown" pentru a respecta regulile de linting.
-    event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET!);
-  } catch (err: unknown) { // <-- Aici este modificarea
-    if (err instanceof Error) {
-        console.error(`❌ Eroare de validare a semnăturii Stripe:`, err.message);
-        return new NextResponse(`Eroare de Webhook: ${err.message}`, { status: 400 });
+    // Construiește evenimentul Stripe pentru a verifica autenticitatea
+    event = stripe.webhooks.constructEvent(
+      rawBody,
+      signature,
+      webhookSecret
+    );
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+        console.error(`[STRIPE_WEBHOOK_ERROR] Verificare semnătură eșuată:`, error.message);
+        return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
     }
-    console.error(`❌ Eroare necunoscută la validarea semnăturii Stripe`);
-    return new NextResponse('Eroare de Webhook.', { status: 400 });
+    console.error(`[STRIPE_WEBHOOK_ERROR] O eroare necunoscută a apărut la verificarea semnăturii.`);
+    return new NextResponse(`Webhook Error: A apărut o eroare necunoscută.`, { status: 400 });
   }
 
-  // Aici procesăm evenimentul Stripe
-  console.log('--- Stripe Webhook Event ---');
-  console.log('Event type:', event.type);
-  console.log('Event object:', event.data.object);
-
+  // Aici procesăm evenimentele de webhook
   switch (event.type) {
-    case 'checkout.session.completed':
+    case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
-      console.log('Session metadata:', session.metadata);
-      console.log('Session customer_email:', session.customer_email);
+      console.log('[STRIPE_WEBHOOK] Eveniment checkout.session.completed primit.');
 
-      const userId = session.metadata?.userId;
-      const planId = session.metadata?.planId as PlanType;
-      const customerEmail = session.customer_email;
+      if (session.metadata?.userId && session.metadata?.planId) {
+        const { userId, planId } = session.metadata;
+        const subscriptionId = session.subscription as string;
 
-      if (!userId || !planId || !customerEmail) {
-        console.error('❌ Date lipsă în metadata Stripe:', session);
-        return new NextResponse('Date incomplete în metadata.', { status: 400 });
+        console.log(`[STRIPE_WEBHOOK] Tentativă de a actualiza planul pentru utilizatorul ${userId} la planul ${planId}.`);
+
+        try {
+          if (typeof userId === 'string' && typeof planId === 'string' && PLANS[planId as PlanType]) {
+            const userRef = doc(db, 'users', userId);
+            
+            const userDoc = await getDoc(userRef);
+            if(userDoc.exists()) {
+              console.log('[STRIPE_WEBHOOK] Starea curentă a documentului Firestore:', userDoc.data());
+            }
+
+            const now = new Date();
+            const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            
+            await updateDoc(userRef, {
+              currentPlan: planId as PlanType,
+              stripeSubscriptionId: subscriptionId,
+              stripeCustomerId: session.customer as string,
+              messagesLimit: PLANS[planId as PlanType].messagesLimit,
+              messagesThisMonth: 0,
+              resetDate: Timestamp.fromDate(resetDate),
+              planStartDate: Timestamp.fromDate(now),
+            });
+            console.log(`[STRIPE_WEBHOOK] Plan actualizat cu succes pentru utilizatorul ${userId}.`);
+          } else {
+            console.error('[STRIPE_WEBHOOK] userId sau planId din metadata sunt invalide sau planul nu există în PLANS.');
+          }
+        } catch (error: unknown) {
+          console.error('[STRIPE_WEBHOOK_UPDATE_ERROR] Eroare la actualizarea documentului Firestore:', error);
+          if (error instanceof Error) {
+            return new NextResponse(`Eroare la actualizarea bazei de date: ${error.message}`, { status: 500 });
+          }
+          return new NextResponse(`Eroare la actualizarea bazei de date`, { status: 500 });
+        }
+      } else {
+        console.error('[STRIPE_WEBHOOK] Metadata-ul sesiunei de checkout lipsește (userId sau planId).');
       }
-
-      // Verificăm dacă planul este valid
-      if (!PLANS[planId]) {
-        console.error('❌ Plan invalid:', planId);
-        return new NextResponse('Planul specificat nu există.', { status: 400 });
-      }
-
-      try {
-        const userDocRef = doc(db, 'users', userId);
-        const newResetDate = new Date();
-        newResetDate.setMonth(newResetDate.getMonth() + 1);
-
-        console.log('Actualizare Firestore pentru user:', userId, 'cu plan:', planId);
-
-        // Actualizăm documentul utilizatorului în Firestore
-        await updateDoc(userDocRef, {
-          currentPlan: planId,
-          messagesLimit: PLANS[planId].messagesLimit,
-          messagesThisMonth: 0,
-          resetDate: newResetDate,
-          planStartDate: new Date(),
-        });
-        console.log(`✅ Planul utilizatorului ${userId} a fost actualizat la ${planId}.`);
-
-      } catch (firestoreError) {
-        console.error('❌ Eroare la actualizarea Firestore:', firestoreError);
-        return new NextResponse('Eroare internă de server.', { status: 500 });
-      }
-
       break;
+    }
+    case 'customer.subscription.deleted':
+    case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription;
+        console.log(`[STRIPE_WEBHOOK] Eveniment ${event.type} primit.`);
+        // Adaugă aici logica pentru a anula planul sau a ajusta datele de facturare
+        // Se folosesc evenimentele de facturare Stripe pentru a gestiona cu precizie
+        // statusul abonamentului
+        break;
+    }
     default:
-      console.log(`Eveniment Stripe ne-gestionat: ${event.type}`);
+      console.log(`[STRIPE_WEBHOOK] Tip de eveniment neașteptat: ${event.type}.`);
   }
 
-  return NextResponse.json({ received: true });
+  return new NextResponse('Procesare webhook reușită.', { status: 200 });
 }
