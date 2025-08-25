@@ -1,11 +1,10 @@
 import Stripe from 'stripe';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, getDoc } from 'firebase/firestore'; // Removed setDoc as it's not used here
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { PlanType, PLANS } from '@/types/subscription';
 import { Timestamp } from 'firebase/firestore';
 
-// Inițializează Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-07-30.basil',
 });
@@ -13,7 +12,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export async function POST(req: NextRequest) {
   let event: Stripe.Event;
 
-  // Obține corpul brut al cererii
   const rawBody = await req.text();
   const signature = req.headers.get('stripe-signature');
 
@@ -29,7 +27,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Construiește evenimentul Stripe pentru a verifica autenticitatea
     event = stripe.webhooks.constructEvent(
       rawBody,
       signature,
@@ -44,7 +41,6 @@ export async function POST(req: NextRequest) {
     return new NextResponse(`Webhook Error: A apărut o eroare necunoscută.`, { status: 400 });
   }
 
-  // Aici procesăm evenimentele de webhook
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -97,9 +93,6 @@ export async function POST(req: NextRequest) {
     case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         console.log(`[STRIPE_WEBHOOK] Eveniment ${event.type} primit.`);
-        // Adaugă aici logica pentru a anula planul sau a ajusta datele de facturare
-        // Se folosesc evenimentele de facturare Stripe pentru a gestiona cu precizie
-        // statusul abonamentului
         break;
     }
     default:
