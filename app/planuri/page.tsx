@@ -5,12 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
 import { PLANS, PlanType } from '@/types/subscription';
-import { loadStripe } from '@stripe/stripe-js';
 
-// Asigură-te că cheia publică Stripe este disponibilă
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-
-// Iconițe (rămân neschimbate)
+// Iconițe
 const CrownIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l3.5 7L12 6l3.5 4L19 3v18H5V3z" /></svg> );
 const CheckIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> );
 const ArrowLeftIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg> );
@@ -120,8 +116,8 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular, isUpgrading }
   );
 }
 
-// Extragem logica client într-o componentă separată
-function PlansContent() {
+// Această componentă este de client și conține toată logica cu hook-uri.
+function PlansPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, userDoc, loading } = useAuth();
@@ -317,12 +313,6 @@ function PlansContent() {
           </div>
         </div>
       </div>
-      {/* <Footer /> */}
     </div>
   );
 }
-
-const getMessagesRemaining = (used: number, limit: number) => {
-  if (limit === -1) return -1;
-  return Math.max(0, limit - used);
-};
