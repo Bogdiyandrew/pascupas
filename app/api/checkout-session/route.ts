@@ -39,9 +39,13 @@ export async function POST(req: NextRequest) {
       signature,
       webhookSecret
     );
-  } catch (error: any) {
-    console.error(`[STRIPE_WEBHOOK_ERROR] Verificare semnătură eșuată:`, error.message);
-    return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
+  } catch (error: unknown) { // Am schimbat `any` în `unknown` pentru a evita eroarea de compilare.
+    if (error instanceof Error) {
+        console.error(`[STRIPE_WEBHOOK_ERROR] Verificare semnătură eșuată:`, error.message);
+        return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
+    }
+    console.error(`[STRIPE_WEBHOOK_ERROR] O eroare necunoscută a apărut la verificarea semnăturii.`);
+    return new NextResponse(`Webhook Error: A apărut o eroare necunoscută.`, { status: 400 });
   }
 
   // Aici procesăm evenimentele de webhook
@@ -84,8 +88,11 @@ export async function POST(req: NextRequest) {
           } else {
             console.error('[STRIPE_WEBHOOK] userId sau planId din metadata sunt invalide sau planul nu există în PLANS.');
           }
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('[STRIPE_WEBHOOK_UPDATE_ERROR] Eroare la actualizarea documentului Firestore:', error);
+          if (error instanceof Error) {
+            return new NextResponse(`Eroare la actualizarea bazei de date: ${error.message}`, { status: 500 });
+          }
           return new NextResponse(`Eroare la actualizarea bazei de date`, { status: 500 });
         }
       } else {
