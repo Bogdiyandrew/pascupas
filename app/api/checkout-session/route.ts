@@ -52,9 +52,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (error: unknown) {
     console.error('[STRIPE_CHECKOUT_ERROR]', error);
-    if (error instanceof Error) {
-        return new NextResponse(`Eroare la crearea sesiunii de checkout: ${error.message}`, { status: 500 });
-    }
-    return new NextResponse('Eroare internă de server.', { status: 500 });
+    // Răspunde mereu cu JSON pentru frontend
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Eroare internă de server.' }, { status: 500 });
   }
 }
