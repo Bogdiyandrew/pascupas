@@ -4,15 +4,13 @@ import { auth } from '@/lib/firebase';
 import { isPlanType, PLANS, PlanType } from '@/types/subscription';
 
 // Inițializează Stripe cu cheia secretă din variabilele de mediu.
-// Această cheie NU trebuie să fie publică.
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-07-30.basil',
 });
 
 // Asociază tipurile de plan cu ID-urile de preț de la Stripe.
-// Aceste ID-uri trebuie să fie configurate ca variabile de mediu.
 const planToPriceId: Record<PlanType, string | null> = {
-  free: null, // Planul gratuit nu are un Price ID
+  free: null,
   premium_monthly: process.env.STRIPE_PRICE_ID_MONTHLY!,
   premium_annual: process.env.STRIPE_PRICE_ID_ANNUAL!,
 };
@@ -39,14 +37,21 @@ export async function POST(req: NextRequest) {
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
-    // Verifică dacă variabila de mediu este setată.
     if (!appUrl || appUrl.trim() === '') {
         console.error('[STRIPE_CHECKOUT_ERROR] Variabila NEXT_PUBLIC_APP_URL nu este definită.');
         return new NextResponse('Eroare la crearea sesiunii de plată: URL-ul aplicației nu este configurat.', { status: 500 });
     }
 
-    // Elimină un eventual trailing slash pentru a preveni URL-uri de forma "https://site.com//path".
-    const cleanedUrl = appUrl.endsWith('/') ? appUrl.slice(0, -1) : appUrl;
+    // Funcție utilitară pentru a asigura că URL-ul are un prefix HTTPS valid.
+    const ensureHttps = (url: string) => {
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            return url;
+        }
+        return `https://${url}`;
+    };
+
+    // Curăță URL-ul și asigură-te că are prefixul https://
+    const cleanedUrl = ensureHttps(appUrl).endsWith('/') ? ensureHttps(appUrl).slice(0, -1) : ensureHttps(appUrl);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -57,7 +62,6 @@ export async function POST(req: NextRequest) {
         },
       ],
       mode: 'subscription',
-      // Folosește URL-ul curățat
       success_url: `${cleanedUrl}/planuri?success=true`,
       cancel_url: `${cleanedUrl}/planuri?canceled=true`,
       customer_email: userEmail,
