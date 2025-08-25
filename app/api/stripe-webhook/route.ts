@@ -18,10 +18,15 @@ export async function POST(req: NextRequest) {
 
   let event: Stripe.Event;
   try {
+    // Înlocuim "any" cu "unknown" pentru a respecta regulile de linting.
     event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET!);
-  } catch (err: any) {
-    console.error(`❌ Eroare de validare a semnăturii Stripe:`, err.message);
-    return new NextResponse(`Eroare de Webhook: ${err.message}`, { status: 400 });
+  } catch (err: unknown) { // <-- Aici este modificarea
+    if (err instanceof Error) {
+        console.error(`❌ Eroare de validare a semnăturii Stripe:`, err.message);
+        return new NextResponse(`Eroare de Webhook: ${err.message}`, { status: 400 });
+    }
+    console.error(`❌ Eroare necunoscută la validarea semnăturii Stripe`);
+    return new NextResponse('Eroare de Webhook.', { status: 400 });
   }
 
   // Aici procesăm evenimentul Stripe
