@@ -30,9 +30,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Aici procesăm evenimentul Stripe
+  console.log('--- Stripe Webhook Event ---');
+  console.log('Event type:', event.type);
+  console.log('Event object:', event.data.object);
+
   switch (event.type) {
     case 'checkout.session.completed':
       const session = event.data.object as Stripe.Checkout.Session;
+      console.log('Session metadata:', session.metadata);
+      console.log('Session customer_email:', session.customer_email);
 
       const userId = session.metadata?.userId;
       const planId = session.metadata?.planId as PlanType;
@@ -53,6 +59,8 @@ export async function POST(req: NextRequest) {
         const userDocRef = doc(db, 'users', userId);
         const newResetDate = new Date();
         newResetDate.setMonth(newResetDate.getMonth() + 1);
+
+        console.log('Actualizare Firestore pentru user:', userId, 'cu plan:', planId);
 
         // Actualizăm documentul utilizatorului în Firestore
         await updateDoc(userDocRef, {
