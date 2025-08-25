@@ -1,10 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
 import { PLANS, PlanType } from '@/types/subscription';
+import { loadStripe } from '@stripe/stripe-js';
+
+// Asigură-te că cheia publică Stripe este disponibilă
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 // Iconițe (rămân neschimbate)
 const CrownIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l3.5 7L12 6l3.5 4L19 3v18H5V3z" /></svg> );
@@ -116,7 +120,8 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular, isUpgrading }
   );
 }
 
-export default function PlanuriPage() {
+// Extragem logica client într-o componentă separată
+function PlansContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, userDoc, loading } = useAuth();
@@ -124,15 +129,12 @@ export default function PlanuriPage() {
   const [stripeMessage, setStripeMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/');
-      }
+    if (!loading && !user) {
+      router.push('/');
     }
   }, [user, loading, router]);
 
   useEffect(() => {
-    // Verificăm parametrii URL-ului pentru mesaje de la Stripe
     const success = searchParams.get('success');
     const canceled = searchParams.get('canceled');
 
@@ -190,136 +192,133 @@ export default function PlanuriPage() {
   const remaining = userDoc.messagesLimit === -1 ? -1 : userDoc.messagesLimit - userDoc.messagesThisMonth;
 
   return (
-    <>
-      <Header />
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeftIcon />
-              <span>Înapoi</span>
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Planuri & Tarife</h1>
-              <p className="text-gray-600 mt-1">Alege planul potrivit pentru nevoile tale</p>
-            </div>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeftIcon />
+            <span>Înapoi</span>
+          </button>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Planuri & Tarife</h1>
+            <p className="text-gray-600 mt-1">Alege planul potrivit pentru nevoile tale</p>
           </div>
+        </div>
 
-          {/* Mesaje de status de la Stripe */}
-          {stripeMessage && (
-            <div className={`flex items-center gap-2 p-4 rounded-lg mb-6 ${
-                stripeMessage.includes('succes') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-            }`}>
-              {stripeMessage.includes('succes') ? <SuccessIcon /> : <ErrorIcon />}
-              <span className="text-sm font-medium">{stripeMessage}</span>
-            </div>
-          )}
+        {/* Mesaje de status de la Stripe */}
+        {stripeMessage && (
+          <div className={`flex items-center gap-2 p-4 rounded-lg mb-6 ${
+              stripeMessage.includes('succes') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          }`}>
+            {stripeMessage.includes('succes') ? <SuccessIcon /> : <ErrorIcon />}
+            <span className="text-sm font-medium">{stripeMessage}</span>
+          </div>
+        )}
 
-          {/* Current Plan Status */}
-          <div className="bg-white rounded-2xl shadow-sm border p-6 mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <CreditCardIcon />
-              <h2 className="text-xl font-semibold text-gray-900">Statusul planului curent</h2>
+        {/* Current Plan Status */}
+        <div className="bg-white rounded-2xl shadow-sm border p-6 mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <CreditCardIcon />
+            <h2 className="text-xl font-semibold text-gray-900">Statusul planului curent</h2>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Planul curent</h3>
+              <p className="text-lg font-bold text-gray-900">{PLANS[currentPlan].name}</p>
             </div>
             
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Planul curent</h3>
-                <p className="text-lg font-bold text-gray-900">{PLANS[currentPlan].name}</p>
-              </div>
-              
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Mesaje utilizate</h3>
-                <p className="text-lg font-bold text-gray-900">
-                  {userDoc.messagesThisMonth} / {userDoc.messagesLimit === -1 ? '∞' : userDoc.messagesLimit}
-                </p>
-              </div>
-              
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Mesaje rămase</h3>
-                <p className={`text-lg font-bold ${remaining <= 3 && remaining !== -1 ? 'text-red-600' : 'text-green-600'}`}>
-                  {remaining === -1 ? 'Nelimitate' : remaining}
-                </p>
-              </div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Mesaje utilizate</h3>
+              <p className="text-lg font-bold text-gray-900">
+                {userDoc.messagesThisMonth} / {userDoc.messagesLimit === -1 ? '∞' : userDoc.messagesLimit}
+              </p>
             </div>
-
-            {currentPlan === 'free' && (
-              <div className="mt-4">
-                <div className="flex justify-between text-sm text-gray-600 mb-2">
-                  <span>Progres utilizare</span>
-                  <span>{Math.round((userDoc.messagesThisMonth / userDoc.messagesLimit) * 100)}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full transition-all duration-500 ${
-                      (userDoc.messagesThisMonth / userDoc.messagesLimit) > 0.8 ? 'bg-red-500' : 'bg-blue-500'
-                    }`}
-                    style={{ width: `${Math.min((userDoc.messagesThisMonth / userDoc.messagesLimit) * 100, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
-              Alege planul potrivit pentru tine
-            </h2>
-            <p className="text-gray-600 text-center mb-12">
-              Upgrade pentru mesaje nelimitate și funcții premium
-            </p>
-
-            <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto pt-4">
-              <PlanCard
-                planType="free"
-                isCurrentPlan={currentPlan === 'free'}
-                onUpgrade={handleUpgrade}
-                isUpgrading={isUpgrading}
-              />
-              
-              <PlanCard
-                planType="premium_monthly"
-                isCurrentPlan={currentPlan === 'premium_monthly'}
-                onUpgrade={handleUpgrade}
-                isUpgrading={isUpgrading}
-              />
-              
-              <PlanCard
-                planType="premium_annual"
-                isCurrentPlan={currentPlan === 'premium_annual'}
-                onUpgrade={handleUpgrade}
-                isPopular={true}
-                isUpgrading={isUpgrading}
-              />
+            
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Mesaje rămase</h3>
+              <p className={`text-lg font-bold ${remaining <= 3 && remaining !== -1 ? 'text-red-600' : 'text-green-600'}`}>
+                {remaining === -1 ? 'Nelimitate' : remaining}
+              </p>
             </div>
           </div>
 
-          {/* FAQ */}
-          <div className="bg-white rounded-2xl shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Întrebări frecvente</h3>
-            <div className="space-y-4 text-sm">
-              <div>
-                <h4 className="font-medium text-gray-900 mb-1">Când se resetează mesajele?</h4>
-                <p className="text-gray-600">Mesajele se resetează automat în prima zi a fiecărei luni.</p>
+          {currentPlan === 'free' && (
+            <div className="mt-4">
+              <div className="flex justify-between text-sm text-gray-600 mb-2">
+                <span>Progres utilizare</span>
+                <span>{Math.round((userDoc.messagesThisMonth / userDoc.messagesLimit) * 100)}%</span>
               </div>
-              <div>
-                <h4 className="font-medium text-gray-900 mb-1">Pot schimba planul oricând?</h4>
-                <p className="text-gray-600">Da, poți schimba planul oricând. Modificările intră în vigoare la următorul ciclu de facturare.</p>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-500 ${
+                    (userDoc.messagesThisMonth / userDoc.messagesLimit) > 0.8 ? 'bg-red-500' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${Math.min((userDoc.messagesThisMonth / userDoc.messagesLimit) * 100, 100)}%` }}
+                ></div>
               </div>
-              <div>
-                <h4 className="font-medium text-gray-900 mb-1">Ce înseamnă mesaje nelimitate?</h4>
-                <p className="text-gray-600">Cu planul Premium poți trimite oricâte mesaje dorești, fără restricții lunare.</p>
-              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
+            Alege planul potrivit pentru tine
+          </h2>
+          <p className="text-gray-600 text-center mb-12">
+            Upgrade pentru mesaje nelimitate și funcții premium
+          </p>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto pt-4">
+            <PlanCard
+              planType="free"
+              isCurrentPlan={currentPlan === 'free'}
+              onUpgrade={handleUpgrade}
+              isUpgrading={isUpgrading}
+            />
+            
+            <PlanCard
+              planType="premium_monthly"
+              isCurrentPlan={currentPlan === 'premium_monthly'}
+              onUpgrade={handleUpgrade}
+              isUpgrading={isUpgrading}
+            />
+            
+            <PlanCard
+              planType="premium_annual"
+              isCurrentPlan={currentPlan === 'premium_annual'}
+              onUpgrade={handleUpgrade}
+              isPopular={true}
+              isUpgrading={isUpgrading}
+            />
+          </div>
+        </div>
+
+        {/* FAQ */}
+        <div className="bg-white rounded-2xl shadow-sm border p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Întrebări frecvente</h3>
+          <div className="space-y-4 text-sm">
+            <div>
+              <h4 className="font-medium text-gray-900 mb-1">Când se resetează mesajele?</h4>
+              <p className="text-gray-600">Mesajele se resetează automat în prima zi a fiecărei luni.</p>
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900 mb-1">Pot schimba planul oricând?</h4>
+              <p className="text-gray-600">Da, poți schimba planul oricând. Modificările intră în vigoare la următorul ciclu de facturare.</p>
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900 mb-1">Ce înseamnă mesaje nelimitate?</h4>
+              <p className="text-gray-600">Cu planul Premium poți trimite oricâte mesaje dorești, fără restricții lunare.</p>
             </div>
           </div>
         </div>
       </div>
       {/* <Footer /> */}
-    </>
+    </div>
   );
 }
 
