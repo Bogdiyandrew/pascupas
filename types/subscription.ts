@@ -14,6 +14,8 @@ export interface FirebaseUser {
   messagesLimit: number;      // SCHIMBAT: limita de mesaje
   resetDate: Timestamp;
   planStartDate: Timestamp;
+  stripeSubscriptionId?: string | null; // Adăugat pentru a rezolva eroarea
+  stripeCustomerId?: string | null;     // Adăugat pentru a rezolva eroarea
 }
 
 export const PLANS = {

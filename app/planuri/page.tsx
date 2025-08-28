@@ -52,9 +52,11 @@ interface PlanCardProps {
   onUpgrade: (plan: PlanType) => void;
   isPopular?: boolean;
   isUpgrading: boolean;
+  onCancel?: () => void;
+  isCanceling: boolean;
 }
 
-function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular, isUpgrading }: PlanCardProps) {
+function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular, isUpgrading, onCancel, isCanceling }: PlanCardProps) {
   const plan = PLANS[planType];
   const isPremium = planType !== 'free';
   const isAnnual = planType === 'premium_annual';
@@ -116,31 +118,44 @@ function PlanCard({ planType, isCurrentPlan, onUpgrade, isPopular, isUpgrading }
       </div>
 
       <div className="mt-auto">
-        <button
-          onClick={() => onUpgrade(planType)}
-          disabled={isCurrentPlan || isUpgrading}
-          className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-            isCurrentPlan || isUpgrading
-              ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-              : isPremium
-              ? 'bg-gradient-to-r from-yellow-400 to-orange-400 text-white hover:from-yellow-500 hover:to-orange-500 shadow-md'
-              : 'bg-gray-800 text-white hover:bg-gray-900'
-          }`}
-        >
-          {isUpgrading ? 'Procesare...' : isCurrentPlan ? 'Planul curent' : planType === 'free' ? 'Schimbă la Gratuit' : 'Upgrade acum'}
-        </button>
+        {isCurrentPlan && isPremium ? (
+          <button
+            onClick={onCancel}
+            disabled={isCanceling}
+            className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+              isCanceling ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-red-500 text-white hover:bg-red-600'
+            }`}
+          >
+            {isCanceling ? 'Anulare...' : 'Anulează abonamentul'}
+          </button>
+        ) : (
+          <button
+            onClick={() => onUpgrade(planType)}
+            disabled={isCurrentPlan || isUpgrading}
+            className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+              isCurrentPlan || isUpgrading
+                ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                : isPremium
+                ? 'bg-gradient-to-r from-yellow-400 to-orange-400 text-white hover:from-yellow-500 hover:to-orange-500 shadow-md'
+                : 'bg-gray-800 text-white hover:bg-gray-900'
+            }`}
+          >
+            {isUpgrading ? 'Procesare...' : isCurrentPlan ? 'Planul curent' : planType === 'free' ? 'Schimbă la Gratuit' : 'Upgrade acum'}
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-// Componenta de client: toată logica cu hook-uri rămâne aici.
 function PlansPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, userDoc, loading } = useAuth();
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [isCanceling, setIsCanceling] = useState(false);
   const [stripeMessage, setStripeMessage] = useState<string | null>(null);
+  const [cancelMessage, setCancelMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -161,10 +176,11 @@ function PlansPageClient() {
 
   const handleUpgrade = async (planType: PlanType) => {
     if (!user || !userDoc || planType === 'free' || isUpgrading) return;
-
+  
     setIsUpgrading(true);
     setStripeMessage(null);
-
+    setCancelMessage(null);
+  
     try {
       const res = await fetch('/api/checkout-session', {
         method: 'POST',
@@ -175,9 +191,9 @@ function PlansPageClient() {
           userEmail: user.email,
         }),
       });
-
+  
       const { url } = await res.json();
-
+  
       if (url) {
         router.push(url);
       } else {
@@ -188,6 +204,53 @@ function PlansPageClient() {
       setStripeMessage('A apărut o eroare la procesarea plății. Te rog încearcă din nou.');
     } finally {
       setIsUpgrading(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!user || !userDoc) {
+        setCancelMessage('Abonamentul nu a putut fi anulat. Te rugăm să te deconectezi și să te reconectezi pentru a actualiza starea abonamentului. Dacă problema persistă, contactează suportul.');
+        return;
+    }
+    
+    if (!userDoc.stripeSubscriptionId) {
+        setCancelMessage('Nu există un abonament activ Stripe asociat acestui cont.');
+        console.error('Anularea abonamentului a eșuat: Câmpul stripeSubscriptionId lipsește din documentul utilizatorului.');
+        return;
+    }
+    
+    if (isCanceling) {
+        return;
+    }
+
+    console.log('Anularea abonamentului Stripe cu ID:', userDoc.stripeSubscriptionId);
+
+    setIsCanceling(true);
+    setCancelMessage(null);
+    setStripeMessage(null);
+
+    try {
+        const res = await fetch('/api/cancel-subscription', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                stripeSubscriptionId: userDoc.stripeSubscriptionId,
+                userId: user.uid,
+            }),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            setCancelMessage('Abonamentul tău a fost anulat cu succes.');
+            window.location.reload(); 
+        } else {
+            throw new Error(data.message || 'Eroare la anularea abonamentului.');
+        }
+    } catch (error: any) {
+        console.error('Eroare la anularea abonamentului:', error);
+        setCancelMessage(`A apărut o eroare: ${error.message}`);
+    } finally {
+        setIsCanceling(false);
     }
   };
 
@@ -221,15 +284,15 @@ function PlansPageClient() {
           </div>
         </div>
 
-        {/* Mesaje de status de la Stripe */}
-        {stripeMessage && (
+        {/* Mesaje de status de la Stripe și anulare */}
+        {(stripeMessage || cancelMessage) && (
           <div
             className={`flex items-center gap-2 p-4 rounded-lg mb-6 ${
-              stripeMessage.includes('succes') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              stripeMessage?.includes('succes') || cancelMessage?.includes('anulat') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
             }`}
           >
-            {stripeMessage.includes('succes') ? <SuccessIcon /> : <ErrorIcon />}
-            <span className="text-sm font-medium">{stripeMessage}</span>
+            {stripeMessage?.includes('succes') || cancelMessage?.includes('anulat') ? <SuccessIcon /> : <ErrorIcon />}
+            <span className="text-sm font-medium">{stripeMessage || cancelMessage}</span>
           </div>
         )}
 
@@ -297,6 +360,7 @@ function PlansPageClient() {
               isCurrentPlan={currentPlan === 'free'}
               onUpgrade={handleUpgrade}
               isUpgrading={isUpgrading}
+              isCanceling={isCanceling}
             />
 
             <PlanCard
@@ -304,6 +368,8 @@ function PlansPageClient() {
               isCurrentPlan={currentPlan === 'premium_monthly'}
               onUpgrade={handleUpgrade}
               isUpgrading={isUpgrading}
+              onCancel={handleCancelSubscription}
+              isCanceling={isCanceling}
             />
 
             <PlanCard
@@ -312,6 +378,8 @@ function PlansPageClient() {
               onUpgrade={handleUpgrade}
               isPopular
               isUpgrading={isUpgrading}
+              onCancel={handleCancelSubscription}
+              isCanceling={isCanceling}
             />
           </div>
         </div>
@@ -339,7 +407,6 @@ function PlansPageClient() {
   );
 }
 
-// Export default cerut de Next.js pentru page.tsx în App Router
 export default function Page() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Se încarcă...</div>}>
