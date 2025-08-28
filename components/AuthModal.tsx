@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, FormEvent, useEffect } from 'react';
-import { 
-  getAuth, 
-  createUserWithEmailAndPassword, 
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
 } from 'firebase/auth';
 import { app } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -26,17 +26,16 @@ export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: bo
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [resetMessage, setResetMessage] = useState(''); // MODIFICARE: Stare pentru mesajul de succes
-
+  const [resetMessage, setResetMessage] = useState('');
   const auth = getAuth(app);
-  const { signIn, sendPasswordReset } = useAuth(); // MODIFICARE: Importăm funcția de resetare
+  const { signIn, sendPasswordReset } = useAuth();
   const googleProvider = new GoogleAuthProvider();
 
   useEffect(() => {
     if (isOpen) {
       setIsLoginView(initialView === 'login');
       setError('');
-      setResetMessage(''); // Resetăm mesajele la deschidere
+      setResetMessage('');
     }
   }, [isOpen, initialView]);
 
@@ -54,7 +53,7 @@ export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: bo
         await createUserWithEmailAndPassword(auth, email, password);
       }
       onClose();
-    } catch (err: unknown) { 
+    } catch (err: unknown) {
       if (typeof err === 'object' && err !== null && 'code' in err) {
         setError(getFirebaseErrorMessage((err as { code: string }).code));
       } else {
@@ -62,12 +61,22 @@ export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: bo
       }
     }
   };
-  
+
   const handleGoogleSignIn = async () => {
-    // ... (rămâne neschimbată)
+    setError('');
+    setResetMessage('');
+    try {
+        await signInWithPopup(auth, googleProvider);
+        onClose();
+    } catch (err: unknown) {
+      if (typeof err === 'object' && err !== null && 'code' in err) {
+        setError(getFirebaseErrorMessage((err as { code: string }).code));
+      } else {
+        setError('A apărut o eroare necunoscută.');
+      }
+    }
   };
 
-  // MODIFICARE: Adăugăm funcția pentru a gestiona click-ul pe "Mi-am uitat parola"
   const handlePasswordReset = async () => {
     if (!email) {
       setError('Te rugăm să introduci adresa de email în câmpul de mai sus.');
@@ -96,7 +105,10 @@ export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: bo
       case 'auth/wrong-password':
       case 'auth/invalid-credential':
         return 'Email sau parolă incorectă. Verifică datele sau resetează parola.';
-      // ... (restul cazurilor rămân la fel)
+      case 'auth/email-already-in-use':
+        return 'Există deja un cont cu această adresă de email.';
+      case 'auth/weak-password':
+        return 'Parola trebuie să aibă cel puțin 6 caractere.';
       default:
         return 'A apărut o eroare. Vă rugăm să încercați din nou.';
     }
@@ -134,7 +146,6 @@ export default function AuthModal({ isOpen, onClose, initialView }: { isOpen: bo
             required
           />
           
-          {/* MODIFICARE: Adăugăm butonul de resetare și mesajele de status */}
           {error && <p className="text-red-500 text-sm text-center pt-2">{error}</p>}
           {resetMessage && <p className="text-green-600 text-sm text-center pt-2">{resetMessage}</p>}
           
