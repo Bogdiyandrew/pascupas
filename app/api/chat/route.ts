@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { adminDb } from '@/lib/firebaseAdmin';
-import { PLANS } from '@/types/subscription';
-import { Timestamp } from 'firebase-admin/firestore';
 
-export const runtime = 'edge';
+export const runtime = 'edge'; // latență mică
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -15,67 +12,77 @@ Ești un psiholog AI empatic, modern și prietenos, care comunică în limba rom
 
 Tonul tău este cald, sincer și optimist, dar realist. Eviți clișeele și frazele impersonale. Adaptezi răspunsurile la situația emoțională a utilizatorului, folosind un limbaj simplu și direct.
 
-Atunci când primești un mesaj de la utilizator, va trebui să îmi returnezi un obiect JSON cu două câmpuri:
-1.  "ai_response": Răspunsul tău empatic și util pentru utilizator.
-2.  "new_profile_data": Un obiect JSON gol {} sau, dacă ai detectat informații noi despre utilizator (vârstă, nume, ocupație etc.), un obiect cu aceste informații. De exemplu: {"name": "Andrei", "age": "30"}.
-
-Iată câteva exemple de detectare:
--   Dacă utilizatorul spune "Mă numesc Andrei", tu returnezi {"name": "Andrei"}.
--   Dacă utilizatorul spune "Am 30 de ani", tu returnezi {"age": "30"}.
--   Dacă utilizatorul spune "Sunt inginer și locuiesc în București", tu returnezi {"occupation": "inginer", "location": "București"}.
--   Dacă nu detectezi nicio informație personală nouă, returnezi {}.
+Structura răspunsurilor:
+1) Validare emoțională
+2) Normalizare
+3) Ghidare practică
+4) Întrebare deschisă
 
 Dacă discuția devine critică (gânduri suicidale sau risc iminent), încurajezi utilizatorul să contacteze imediat un profesionist și oferi numărul liniei de criză din România: 0800 801 200.
 `;
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, profileData, userId } = await req.json();
+    const { messages, profileData } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return new Response('Lipsesc mesajele din request.', { status: 400 });
     }
 
-    // Adăugăm datele de profil existente la prompt pentru a oferi context AI-ului.
-    let fullSystemPrompt = defaultSystemPrompt;
+    let systemPrompt = defaultSystemPrompt;
     if (profileData && Object.keys(profileData).length > 0) {
-      fullSystemPrompt += `\n\nIată informațiile actuale pe care le știi despre utilizator: ${JSON.stringify(profileData)}`;
+        systemPrompt += `\n\nAI-ul ar trebui să țină minte următoarele informații despre utilizator de-a lungul conversațiilor:`;
+        if (profileData.name) {
+            systemPrompt += `\n- Nume: ${profileData.name}`;
+        }
+        if (profileData.age) {
+            systemPrompt += `\n- Vârstă: ${profileData.age} ani`;
+        }
+        if (profileData.gender) {
+            systemPrompt += `\n- Gen: ${profileData.gender}`;
+        }
+        if (profileData.location) {
+            systemPrompt += `\n- Locație: ${profileData.location}`;
+        }
+        if (profileData.occupation) {
+            systemPrompt += `\n- Ocupație: ${profileData.occupation}`;
+        }
     }
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      stream: false, // Am dezactivat streaming-ul pentru a obține un singur obiect JSON.
+      stream: true,
       temperature: 0.7,
       max_tokens: 500,
-      response_format: { type: "json_object" }, // Setăm formatul de răspuns la JSON.
-      messages: [{ role: 'system', content: fullSystemPrompt }, ...messages],
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
     });
-    
-    // Parsăm răspunsul JSON primit de la AI.
-    const responseBody = JSON.parse(completion.choices[0]?.message.content || '{}');
-    const aiResponse = responseBody.ai_response || 'Scuze, a apărut o problemă.';
-    const newProfileData = responseBody.new_profile_data || {};
 
-    // Actualizăm Firestore cu noile date detectate de AI.
-    if (Object.keys(newProfileData).length > 0 && userId) {
-      const userRef = adminDb.collection('users').doc(userId);
-      const userDoc = await userRef.get();
-      if (userDoc.exists) {
-        const existingData = userDoc.data()?.profileData || {};
-        await userRef.update({
-          profileData: { ...existingData, ...newProfileData }
-        });
-      }
-    }
+    const encoder = new TextEncoder();
 
-    return new Response(aiResponse, {
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          for await (const chunk of completion) {
+            const content = chunk.choices[0]?.delta?.content;
+            if (content) {
+              controller.enqueue(encoder.encode(content));
+            }
+          }
+        } catch (err: unknown) {
+          controller.error(err);
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
       status: 200,
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
       },
     });
-
   } catch (error: unknown) {
     console.error('[CHAT_API_ERROR]', error);
     const errorMessage = error instanceof Error ? error.message : 'Eroare internă de server necunoscută.';
