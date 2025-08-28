@@ -199,9 +199,10 @@ function PlansPageClient() {
       } else {
         throw new Error('Nu s-a putut obține URL-ul de checkout.');
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Eroare la crearea sesiunii de plată.';
       console.error('Eroare la crearea sesiunii de plată:', error);
-      setStripeMessage('A apărut o eroare la procesarea plății. Te rog încearcă din nou.');
+      setStripeMessage(`A apărut o eroare la procesarea plății: ${errorMessage}`);
     } finally {
       setIsUpgrading(false);
     }
@@ -246,9 +247,10 @@ function PlansPageClient() {
         } else {
             throw new Error(data.message || 'Eroare la anularea abonamentului.');
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Eroare la anularea abonamentului.';
         console.error('Eroare la anularea abonamentului:', error);
-        setCancelMessage(`A apărut o eroare: ${error.message}`);
+        setCancelMessage(`A apărut o eroare: ${errorMessage}`);
     } finally {
         setIsCanceling(false);
     }
