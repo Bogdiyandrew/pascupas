@@ -77,7 +77,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     try {
       const userRef: DocumentReference = doc(db, 'users', user.uid);
-      await updateDoc(userRef, { profileData: newProfileData });
+      await updateDoc(userRef, {
+        profileData: {
+          ...(userDoc?.profileData || {}),
+          ...newProfileData
+        }
+      });
     } catch (error) {
       console.error('❌ Eroare la actualizarea profilului:', error);
     }
