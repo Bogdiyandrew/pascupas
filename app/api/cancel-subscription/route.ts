@@ -30,7 +30,6 @@ export async function POST(req: NextRequest) {
       console.log(`[CANCEL_API] Subscription ${stripeSubscriptionId} successfully canceled on Stripe.`);
     } catch (stripeError: unknown) {
       console.error('[CANCEL_API] Stripe API error:', stripeError);
-      // Asigură-te că eroarea este de tip Error înainte de a-i accesa proprietățile
       const errorMessage = stripeError instanceof Error ? stripeError.message : 'Eroare necunoscută la Stripe.';
       return new NextResponse(`Eroare Stripe: ${errorMessage}`, { status: 500 });
     }
@@ -55,7 +54,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error: unknown) {
     console.error('[CANCEL_API] Unexpected error:', error);
-    // Asigură-te că eroarea este de tip Error înainte de a-i accesa proprietățile
     const errorMessage = error instanceof Error ? error.message : 'Eroare internă de server necunoscută.';
     return new NextResponse(`Eroare internă de server: ${errorMessage}`, { status: 500 });
   }
