@@ -8,7 +8,7 @@ import {
   User,
   sendPasswordResetEmail
 } from 'firebase/auth';
-import { doc, setDoc, updateDoc, Timestamp, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, Timestamp, onSnapshot, DocumentReference } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { initializeChatCrypto, clearChatCrypto } from '@/lib/cryptoChat';
 import { FirebaseUser, PLANS, canSendMessage, getMessagesRemaining } from '@/types/subscription';
@@ -26,6 +26,7 @@ interface AuthContextType {
   getMessagesRemaining: () => number;
   getCurrentPlan: () => string;
   incrementMessagesUsed: () => Promise<void>;
+  updateUserProfile: (profileData: Partial<FirebaseUser['profileData']>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -69,6 +70,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Eroare la trimiterea emailului de resetare:", error);
       throw error;
+    }
+  };
+
+  const updateUserProfile = async (newProfileData: Partial<FirebaseUser['profileData']>): Promise<void> => {
+    if (!user) return;
+    try {
+      const userRef: DocumentReference = doc(db, 'users', user.uid);
+      await updateDoc(userRef, { profileData: newProfileData });
+    } catch (error) {
+      console.error('❌ Eroare la actualizarea profilului:', error);
     }
   };
 
@@ -170,7 +181,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canSendMessage: canSendMessageCheck,
       getMessagesRemaining: getMessagesRemainingCount,
       getCurrentPlan,
-      incrementMessagesUsed
+      incrementMessagesUsed,
+      updateUserProfile // Aici se expune noua funcție
     }}>
       {children}
     </AuthContext.Provider>
