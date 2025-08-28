@@ -42,8 +42,16 @@ export default function AccountPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [name, setName] = useState(userDoc?.profileData?.name || '');
-  const [occupation, setOccupation] = useState(userDoc?.profileData?.occupation || '');
+
+  // Stările locale pentru câmpurile de profil
+  const [name, setName] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState('');
+  const [location, setLocation] = useState('');
+  const [occupation, setOccupation] = useState('');
+  const [hobbies, setHobbies] = useState<string[]>([]);
+  const [relationshipStatus, setRelationshipStatus] = useState('');
+
   const [isProfileSaving, setIsProfileSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
@@ -51,7 +59,12 @@ export default function AccountPage() {
   useEffect(() => {
     if (userDoc) {
       setName(userDoc.profileData?.name || '');
+      setAge(userDoc.profileData?.age || '');
+      setGender(userDoc.profileData?.gender || '');
+      setLocation(userDoc.profileData?.location || '');
       setOccupation(userDoc.profileData?.occupation || '');
+      setHobbies(userDoc.profileData?.hobbies || []);
+      setRelationshipStatus(userDoc.profileData?.relationshipStatus || '');
     }
   }, [userDoc]);
 
@@ -85,8 +98,18 @@ export default function AccountPage() {
     setSaveMessage('');
     setErrorMessage('');
 
+    const newProfileData = {
+      name,
+      age,
+      gender,
+      location,
+      occupation,
+      hobbies,
+      relationshipStatus,
+    };
+
     try {
-      await updateUserProfile({ name, occupation });
+      await updateUserProfile(newProfileData);
       setSaveMessage('Profilul a fost salvat cu succes!');
     } catch (error) {
       console.error('Eroare la salvarea profilului:', error);
@@ -166,20 +189,72 @@ export default function AccountPage() {
             <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">Profilul Meu</h2>
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Nume</label>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nume</label>
                 <input
                   type="text"
+                  id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Ocupație</label>
+                <label htmlFor="age" className="block text-sm font-medium text-gray-700">Vârstă</label>
+                <input
+                  type="number"
+                  id="age"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="gender" className="block text-sm font-medium text-gray-700">Gen</label>
                 <input
                   type="text"
+                  id="gender"
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="location" className="block text-sm font-medium text-gray-700">Locație</label>
+                <input
+                  type="text"
+                  id="location"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="occupation" className="block text-sm font-medium text-gray-700">Ocupație</label>
+                <input
+                  type="text"
+                  id="occupation"
                   value={occupation}
                   onChange={(e) => setOccupation(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="hobbies" className="block text-sm font-medium text-gray-700">Hobby-uri (separate prin virgulă)</label>
+                <input
+                  type="text"
+                  id="hobbies"
+                  value={hobbies.join(', ')}
+                  onChange={(e) => setHobbies(e.target.value.split(',').map(h => h.trim()))}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="relationshipStatus" className="block text-sm font-medium text-gray-700">Stare civilă</label>
+                <input
+                  type="text"
+                  id="relationshipStatus"
+                  value={relationshipStatus}
+                  onChange={(e) => setRelationshipStatus(e.target.value)}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 />
               </div>
