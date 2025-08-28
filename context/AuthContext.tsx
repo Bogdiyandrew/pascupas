@@ -6,7 +6,7 @@ import {
   signOut, 
   onIdTokenChanged,
   User,
-  sendPasswordResetEmail // MODIFICARE: Importăm funcția de resetare
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, setDoc, updateDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -20,7 +20,7 @@ interface AuthContextType {
   cryptoReady: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  sendPasswordReset: (email: string) => Promise<void>; // MODIFICARE: Adăugăm noua funcție
+  sendPasswordReset: (email: string) => Promise<void>;
   
   canSendMessage: () => boolean;
   getMessagesRemaining: () => number;
@@ -36,7 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [cryptoReady, setCryptoReady] = useState(false);
 
-  // ... (initializeNewUser și signIn rămân neschimbate)
   const initializeNewUser = async (firebaseUser: User): Promise<FirebaseUser> => {
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -48,7 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       messagesThisMonth: 0,
       messagesLimit: PLANS.free.messagesLimit,
       resetDate: Timestamp.fromDate(nextMonth),
-      planStartDate: Timestamp.fromDate(now)
+      planStartDate: Timestamp.fromDate(now),
+      profileData: {}
     };
 
     await setDoc(doc(db, 'users', firebaseUser.uid), newUserDoc);
@@ -63,18 +63,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth);
   };
   
-  // MODIFICARE: Adăugăm funcția pentru resetarea parolei
   const sendPasswordReset = async (email: string) => {
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
       console.error("Eroare la trimiterea emailului de resetare:", error);
-      throw error; // Aruncăm eroarea pentru a fi prinsă în AuthModal
+      throw error;
     }
   };
 
   useEffect(() => {
-    // ... (useEffect rămâne neschimbat)
     let unsubscribeFromFirestore: (() => void) | null = null;
 
     const unsubscribeFromAuth = onIdTokenChanged(auth, async (firebaseUser) => {
@@ -168,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cryptoReady,
       signIn,
       logout,
-      sendPasswordReset, // MODIFICARE: Expunem funcția prin context
+      sendPasswordReset,
       canSendMessage: canSendMessageCheck,
       getMessagesRemaining: getMessagesRemainingCount,
       getCurrentPlan,
