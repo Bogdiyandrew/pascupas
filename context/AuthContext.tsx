@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('❌ Eroare la actualizarea profilului:', error);
     }
-  };
+};
 
   useEffect(() => {
     let unsubscribeFromFirestore: (() => void) | null = null;

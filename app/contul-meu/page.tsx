@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { useAuth } from '@/context/AuthContext';
@@ -36,12 +36,24 @@ function DeleteAccountModal({ onConfirm, onCancel, isLoading }: { onConfirm: () 
 }
 
 export default function AccountPage() {
-  const { user, userDoc, loading, logout, sendPasswordReset } = useAuth();
+  const { user, userDoc, loading, logout, sendPasswordReset, updateUserProfile } = useAuth();
   const router = useRouter();
   const [resetMessage, setResetMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [name, setName] = useState(userDoc?.profileData?.name || '');
+  const [occupation, setOccupation] = useState(userDoc?.profileData?.occupation || '');
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+
+  // Setează stările locale cu datele utilizatorului la încărcarea paginii
+  useEffect(() => {
+    if (userDoc) {
+      setName(userDoc.profileData?.name || '');
+      setOccupation(userDoc.profileData?.occupation || '');
+    }
+  }, [userDoc]);
 
   // Protejăm ruta: dacă nu există utilizator după încărcare, redirecționăm
   useEffect(() => {
@@ -62,6 +74,25 @@ export default function AccountPage() {
     } catch (error) {
       setErrorMessage('A apărut o eroare la trimiterea emailului.');
       setResetMessage('');
+    }
+  };
+
+  const handleSaveProfile = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!user || !userDoc || isProfileSaving) return;
+
+    setIsProfileSaving(true);
+    setSaveMessage('');
+    setErrorMessage('');
+
+    try {
+      await updateUserProfile({ name, occupation });
+      setSaveMessage('Profilul a fost salvat cu succes!');
+    } catch (error) {
+      console.error('Eroare la salvarea profilului:', error);
+      setErrorMessage('A apărut o eroare la salvarea profilului.');
+    } finally {
+      setIsProfileSaving(false);
     }
   };
 
@@ -128,6 +159,43 @@ export default function AccountPage() {
               <p className="text-gray-500">Adresă de email</p>
               <p className="font-medium text-gray-800">{email}</p>
             </div>
+          </div>
+          
+          {/* NOU: Card pentru profilul utilizatorului */}
+          <div className="bg-white rounded-2xl shadow-sm border p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">Profilul Meu</h2>
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Nume</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Ocupație</label>
+                <input
+                  type="text"
+                  value={occupation}
+                  onChange={(e) => setOccupation(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                />
+              </div>
+              {saveMessage && <p className="text-green-600 text-sm mt-2">{saveMessage}</p>}
+              <div className="pt-2">
+                <button 
+                  type="submit" 
+                  disabled={isProfileSaving}
+                  className={`px-4 py-2 rounded-lg font-medium text-white transition-colors ${
+                    isProfileSaving ? 'bg-gray-300 cursor-not-allowed' : 'bg-primary hover:bg-opacity-90'
+                  }`}
+                >
+                  {isProfileSaving ? 'Se salvează...' : 'Salvează Profilul'}
+                </button>
+              </div>
+            </form>
           </div>
           
           {/* Card Status Abonament */}
