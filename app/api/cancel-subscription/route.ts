@@ -25,13 +25,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Anulează abonamentul în Stripe
-    let subscription;
     try {
-      subscription = await stripe.subscriptions.cancel(stripeSubscriptionId);
+      await stripe.subscriptions.cancel(stripeSubscriptionId);
       console.log(`[CANCEL_API] Subscription ${stripeSubscriptionId} successfully canceled on Stripe.`);
-    } catch (stripeError: any) {
+    } catch (stripeError: unknown) {
       console.error('[CANCEL_API] Stripe API error:', stripeError);
-      return new NextResponse(`Eroare Stripe: ${stripeError.message}`, { status: 500 });
+      // Asigură-te că eroarea este de tip Error înainte de a-i accesa proprietățile
+      const errorMessage = stripeError instanceof Error ? stripeError.message : 'Eroare necunoscută la Stripe.';
+      return new NextResponse(`Eroare Stripe: ${errorMessage}`, { status: 500 });
     }
 
     // Actualizează documentul utilizatorului în Firestore
@@ -52,9 +53,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ message: 'Abonament anulat cu succes.' }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[CANCEL_API] Unexpected error:', error);
-    // Returnează un răspuns JSON chiar și în cazul unei erori neașteptate
-    return new NextResponse(`Eroare internă de server: ${error.message}`, { status: 500 });
+    // Asigură-te că eroarea este de tip Error înainte de a-i accesa proprietățile
+    const errorMessage = error instanceof Error ? error.message : 'Eroare internă de server necunoscută.';
+    return new NextResponse(`Eroare internă de server: ${errorMessage}`, { status: 500 });
   }
 }
