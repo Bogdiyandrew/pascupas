@@ -8,45 +8,57 @@ export interface FirebaseUser {
   email: string;
   createdAt: Timestamp;
   
-  // Planuri și utilizare - MODIFICAT pentru mesaje
+  // Planuri și utilizare
   currentPlan: PlanType;
-  messagesThisMonth: number;  // SCHIMBAT: mesaje în loc de conversații
-  messagesLimit: number;      // SCHIMBAT: limita de mesaje
+  messagesThisMonth: number;
+  messagesLimit: number;
   resetDate: Timestamp;
   planStartDate: Timestamp;
-  stripeSubscriptionId?: string | null; // Adăugat pentru a rezolva eroarea
-  stripeCustomerId?: string | null;     // Adăugat pentru a rezolva eroarea
+  stripeSubscriptionId?: string | null;
+  stripeCustomerId?: string | null;
+  
+  // Noul câmp pentru stocarea datelor personale ale utilizatorului
+  profileData: {
+    name?: string;
+    age?: string;
+    gender?: string;
+    location?: string;
+    occupation?: string;
+    hobbies?: string[]; // Poate fi un array pentru mai multe hobby-uri
+    relationshipStatus?: string;
+    // Aici poți adăuga și alte câmpuri
+  };
 }
 
 export const PLANS = {
   free: {
     name: 'Gratuit',
     price: 0,
-    messagesLimit: 15,  // SCHIMBAT: 15 mesaje pe lună
+    messagesLimit: 15,
     features: ['15 mesaje pe lună', 'Criptare securizată']
   },
   premium_monthly: {
     name: 'Premium Lunar', 
     price: 35,
-    messagesLimit: -1, // unlimited
+    messagesLimit: -1,
     features: ['Mesaje nelimitate', 'Criptare securizată', 'Suport prioritar']
   },
   premium_annual: {
     name: 'Premium Anual',
     price: 349, 
-    messagesLimit: -1, // unlimited
+    messagesLimit: -1,
     features: ['Mesaje nelimitate', 'Criptare securizată', 'Suport prioritar', 'Economisești 2 luni']
   }
 };
 
-// Funcții helper - MODIFICATE pentru mesaje
+// Funcții helper
 export function canSendMessage(messagesUsed: number, limit: number): boolean {
-  if (limit === -1) return true; // unlimited
+  if (limit === -1) return true;
   return messagesUsed < limit;
 }
 
 export function getMessagesRemaining(messagesUsed: number, limit: number): number {
-  if (limit === -1) return -1; // unlimited
+  if (limit === -1) return -1;
   return Math.max(0, limit - messagesUsed);
 }
 

@@ -82,7 +82,7 @@ const PrivateModeIndicator = () => (
 );
 
 export default function ChatPage() {
-    const { user, loading: authLoading, cryptoReady, canSendMessage, incrementMessagesUsed, getMessagesRemaining } = useAuth();
+    const { user, userDoc, loading: authLoading, cryptoReady, canSendMessage, incrementMessagesUsed, getMessagesRemaining } = useAuth();
     const router = useRouter();
     const [hasConsented, setHasConsented] = useState(false);
     const [noStore, setNoStore] = useState(false);
@@ -97,6 +97,16 @@ export default function ChatPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const chatContainerRef = useRef<HTMLDivElement>(null);
+
+    const updateUserProfile = useCallback(async (newProfileData: any) => {
+        if (!user || !userDoc) return;
+        try {
+            const userRef = doc(db, 'users', user.uid);
+            await updateDoc(userRef, { profileData: { ...userDoc.profileData, ...newProfileData } });
+        } catch (error) {
+            console.error('Eroare la actualizarea profilului utilizatorului:', error);
+        }
+    }, [user, userDoc]);
 
     useEffect(() => {
         const consent = localStorage.getItem('gdprConsent');
@@ -215,12 +225,45 @@ export default function ChatPage() {
         setIsLoading(true);
         setError('');
 
+        if (userDoc) {
+            let newProfileData = {};
+            const ageMatch = text.match(/am (\d{1,3}) de ani/i);
+            if (ageMatch && ageMatch[1]) {
+                newProfileData = { ...newProfileData, age: ageMatch[1] };
+            }
+
+            const nameMatch = text.match(/(mă numesc|sunt) ([A-Za-z\s]+)/i);
+            if (nameMatch && nameMatch[2]) {
+                newProfileData = { ...newProfileData, name: nameMatch[2].trim() };
+            }
+            
+            const genderMatch = text.match(/(sunt|ma simt) (barbat|femeie)/i);
+            if (genderMatch && genderMatch[2]) {
+                newProfileData = { ...newProfileData, gender: genderMatch[2].trim().toLowerCase() };
+            }
+
+            const locationMatch = text.match(/locuiesc în (.+)/i);
+            if (locationMatch && locationMatch[1]) {
+                newProfileData = { ...newProfileData, location: locationMatch[1].trim() };
+            }
+            
+            const occupationMatch = text.match(/lucrez ca un? (?:[a-z]+ )?([a-zA-Z\s-]+)/i);
+            if (occupationMatch && occupationMatch[1]) {
+                newProfileData = { ...newProfileData, occupation: occupationMatch[1].trim() };
+            }
+
+            if (Object.keys(newProfileData).length > 0) {
+                updateUserProfile(newProfileData);
+            }
+        }
+
         try {
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     messages: currentDisplayMessages.map(({ role, content }) => ({ role, content })),
+                    profileData: userDoc?.profileData,
                 }),
             });
 
@@ -374,14 +417,14 @@ export default function ChatPage() {
     }
 
     const remainingMessages = getMessagesRemaining();
-    const displayRemaining = remainingMessages === -1 || remainingMessages === Infinity ? 'Nelimitat' : remainingMessages;
+    const displayRemaining = remainingMessages === -1 || remainingMessages === Infinity ? 'Nelimitate' : remainingMessages;
 
     return (
         <>
             <Header />
             <div className="flex h-[calc(100vh-88px)] relative overflow-hidden">
                 {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-20 md:hidden"></div>}
-                <aside className={`absolute top-0 left-0 h-full w-3-4 max-w-xs md:w-1/4 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out bg-background border-r border-gray-200 p-6 flex flex-col z-30`}>
+                <aside className={`absolute top-0 left-0 h-full w-3/4 max-w-xs md:w-1/4 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out bg-background border-r border-gray-200 p-6 flex flex-col z-30`}>
                     <button onClick={startNewConversation} className="flex items-center justify-center gap-2 w-full bg-primary text-white font-bold p-3 rounded-lg hover:bg-opacity-90 transition-colors mb-4">
                         <PlusIcon /> Conversație Nouă
                     </button>

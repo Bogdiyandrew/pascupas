@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 export const runtime = 'edge'; // latență mică
@@ -7,7 +7,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-const systemPrompt = `
+const defaultSystemPrompt = `
 Ești un psiholog AI empatic, modern și prietenos, care comunică în limba română. Rolul tău este să asculți utilizatorii, să le validezi emoțiile, să le oferi suport emoțional și ghidare practică, fără a oferi diagnostice medicale. Nu înlocuiești terapia umană și nu prescrii tratamente.
 
 Tonul tău este cald, sincer și optimist, dar realist. Eviți clișeele și frazele impersonale. Adaptezi răspunsurile la situația emoțională a utilizatorului, folosind un limbaj simplu și direct.
@@ -23,10 +23,30 @@ Dacă discuția devine critică (gânduri suicidale sau risc iminent), încuraje
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json();
+    const { messages, profileData } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return new Response('Lipsesc mesajele din request.', { status: 400 });
+    }
+
+    let systemPrompt = defaultSystemPrompt;
+    if (profileData && Object.keys(profileData).length > 0) {
+        systemPrompt += `\n\nAI-ul ar trebui să țină minte următoarele informații despre utilizator de-a lungul conversațiilor:`;
+        if (profileData.name) {
+            systemPrompt += `\n- Nume: ${profileData.name}`;
+        }
+        if (profileData.age) {
+            systemPrompt += `\n- Vârstă: ${profileData.age} ani`;
+        }
+        if (profileData.gender) {
+            systemPrompt += `\n- Gen: ${profileData.gender}`;
+        }
+        if (profileData.location) {
+            systemPrompt += `\n- Locație: ${profileData.location}`;
+        }
+        if (profileData.occupation) {
+            systemPrompt += `\n- Ocupație: ${profileData.occupation}`;
+        }
     }
 
     const completion = await openai.chat.completions.create({
@@ -48,7 +68,7 @@ export async function POST(req: NextRequest) {
               controller.enqueue(encoder.encode(content));
             }
           }
-        } catch (err) {
+        } catch (err: unknown) {
           controller.error(err);
         } finally {
           controller.close();
@@ -63,8 +83,9 @@ export async function POST(req: NextRequest) {
         'Cache-Control': 'no-cache, no-transform',
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[CHAT_API_ERROR]', error);
-    return new Response('Eroare internă de server.', { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Eroare internă de server necunoscută.';
+    return new Response(`Eroare internă de server: ${errorMessage}`, { status: 500 });
   }
 }
