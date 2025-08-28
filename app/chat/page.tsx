@@ -1,4 +1,3 @@
-// app/chat/page.tsx
 'use client';
 
 import { useState, useRef, useEffect, FormEvent, useCallback } from 'react';
@@ -103,7 +102,7 @@ export default function ChatPage() {
         try {
             const userRef = doc(db, 'users', user.uid);
             await updateDoc(userRef, { profileData: { ...userDoc.profileData, ...newProfileData } });
-        } catch (error) {
+        } catch (error: unknown) { // Corectat: any -> unknown
             console.error('Eroare la actualizarea profilului utilizatorului:', error);
         }
     }, [user, userDoc]);
@@ -225,38 +224,6 @@ export default function ChatPage() {
         setIsLoading(true);
         setError('');
 
-        if (userDoc) {
-            let newProfileData = {};
-            const ageMatch = text.match(/am (\d{1,3}) de ani/i);
-            if (ageMatch && ageMatch[1]) {
-                newProfileData = { ...newProfileData, age: ageMatch[1] };
-            }
-
-            const nameMatch = text.match(/(mă numesc|sunt) ([A-Za-z\s]+)/i);
-            if (nameMatch && nameMatch[2]) {
-                newProfileData = { ...newProfileData, name: nameMatch[2].trim() };
-            }
-            
-            const genderMatch = text.match(/(sunt|ma simt) (barbat|femeie)/i);
-            if (genderMatch && genderMatch[2]) {
-                newProfileData = { ...newProfileData, gender: genderMatch[2].trim().toLowerCase() };
-            }
-
-            const locationMatch = text.match(/locuiesc în (.+)/i);
-            if (locationMatch && locationMatch[1]) {
-                newProfileData = { ...newProfileData, location: locationMatch[1].trim() };
-            }
-            
-            const occupationMatch = text.match(/lucrez ca un? (?:[a-z]+ )?([a-zA-Z\s-]+)/i);
-            if (occupationMatch && occupationMatch[1]) {
-                newProfileData = { ...newProfileData, occupation: occupationMatch[1].trim() };
-            }
-
-            if (Object.keys(newProfileData).length > 0) {
-                updateUserProfile(newProfileData);
-            }
-        }
-
         try {
             const res = await fetch('/api/chat', {
                 method: 'POST',
@@ -264,30 +231,20 @@ export default function ChatPage() {
                 body: JSON.stringify({
                     messages: currentDisplayMessages.map(({ role, content }) => ({ role, content })),
                     profileData: userDoc?.profileData,
+                    userId: user.uid,
                 }),
             });
 
-            if (!res.ok || !res.body) throw new Error('A apărut o eroare la server. Încearcă din nou.');
+            if (!res.ok) {
+              const errorText = await res.text();
+              throw new Error(errorText || 'A apărut o eroare la server. Încearcă din nou.');
+            }
             
             await incrementMessagesUsed();
 
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let aiText = '';
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                aiText += decoder.decode(value, { stream: true });
-                setMessages((prev) => {
-                    const copy = [...prev];
-                    const lastMsg = { ...copy[copy.length - 1], content: aiText };
-                    copy[copy.length - 1] = lastMsg;
-                    return copy;
-                });
-            }
-
-            const finalAssistantMessage: Message = { role: 'assistant', content: aiText };
+            const aiResponseText = await res.text();
+            
+            const finalAssistantMessage: Message = { role: 'assistant', content: aiResponseText };
             
             if (!noStore && cryptoReady) {
                 if (!isChatCryptoReady()) {
