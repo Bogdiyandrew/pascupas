@@ -11,34 +11,22 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 const resend = new Resend(process.env.RESEND_API_KEY); // Inițializează clientul Resend
 
-// Funcție pentru a genera conținutul e-mailului și a trimite factura
-async function sendConfirmationEmailAndInvoice(session: Stripe.Checkout.Session) {
+// Funcție pentru a genera conținutul e-mailului de confirmare
+async function sendConfirmationEmail(session: Stripe.Checkout.Session) {
   const customerEmail = session.customer_email;
-  const subscriptionId = session.subscription as string;
   
-  if (!customerEmail || !subscriptionId) {
-    console.error('Eroare: Nu se poate trimite e-mail de confirmare, lipsesc datele necesare.');
+  if (!customerEmail) {
+    console.error('Eroare: Nu se poate trimite e-mail de confirmare, lipsește adresa de e-mail.');
     return;
   }
 
   try {
-    // Obține detaliile abonamentului de la Stripe pentru a crea o factură
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-      expand: ['latest_invoice.payment_intent'],
-    });
-
-    const invoice = subscription.latest_invoice as Stripe.Invoice;
-
-    // Creează un URL securizat pentru a descărca factura
-    const invoicePdfUrl = invoice.invoice_pdf;
-
     // Aici poți crea conținutul e-mailului
     const emailHtml = `
       <h1>Mulțumim pentru abonament!</h1>
       <p>Salut,</p>
       <p>Îți mulțumim că ai ales planul <b>${PLANS[session.metadata?.planId as PlanType].name}</b> de la PascuPas.online.</p>
       <p>Abonamentul tău este acum activ. Te poți bucura de toate funcționalitățile premium.</p>
-      <p>Poți descărca factura de aici: <a href="${invoicePdfUrl}">Factură #${invoice.id}</a></p>
       <p>Începe o conversație: <a href="${process.env.NEXT_PUBLIC_APP_URL}/chat">Accesează chat-ul</a></p>
       <p>Cu drag,<br/>Echipa PascuPas</p>
     `;
@@ -54,7 +42,7 @@ async function sendConfirmationEmailAndInvoice(session: Stripe.Checkout.Session)
     console.log(`[EMAIL_SENT] E-mail de confirmare trimis către ${customerEmail}.`);
 
   } catch (error) {
-    console.error('[EMAIL_SEND_ERROR] Eroare la trimiterea e-mailului sau obținerea facturii:', error);
+    console.error('[EMAIL_SEND_ERROR] Eroare la trimiterea e-mailului:', error);
   }
 }
 
@@ -95,8 +83,8 @@ export async function POST(req: NextRequest) {
       const session = event.data.object as Stripe.Checkout.Session;
       console.log('[STRIPE_WEBHOOK] Eveniment checkout.session.completed primit.');
 
-      // APEL NOU: Trimite e-mailul și factura după ce plata este confirmată
-      await sendConfirmationEmailAndInvoice(session);
+      // APEL NOU: Trimite e-mailul de confirmare după ce plata este confirmată
+      await sendConfirmationEmail(session);
       
       if (session.metadata?.userId && session.metadata?.planId) {
         const { userId, planId } = session.metadata;
@@ -127,7 +115,7 @@ export async function POST(req: NextRequest) {
             });
             console.log(`[STRIPE_WEBHOOK] Plan actualizat cu succes pentru utilizatorul ${userId}.`);
           } else {
-            console.error('[STRIPE_WEBHOOK] userId sau planid din metadata sunt invalide sau planul nu există în PLANS.');
+            console.error('[STRIPE_WEBHOOK] userId sau planId din metadata sunt invalide sau planul nu există în PLANS.');
           }
         } catch (error: unknown) {
           console.error('[STRIPE_WEBHOOK_UPDATE_ERROR] Eroare la actualizarea documentului Firestore:', error);
