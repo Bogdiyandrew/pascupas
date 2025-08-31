@@ -168,11 +168,16 @@ function PlansPageClient() {
     const canceled = searchParams.get('canceled');
 
     if (success) {
-      setStripeMessage('Plata a fost procesată cu succes! Planul tău va fi actualizat în curând.');
+      setStripeMessage('Plata a fost procesată cu succes! Vei fi redirecționat în scurt timp.');
+      // Redirecționare automată după 3 secunde
+      const timer = setTimeout(() => {
+        router.push('/chat'); // Redirecționează către pagina de chat
+      }, 3000); 
+      return () => clearTimeout(timer); // Curăță timer-ul dacă componenta se demontează
     } else if (canceled) {
       setStripeMessage('Plata a fost anulată. Te poți abona oricând dorești.');
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const handleUpgrade = async (planType: PlanType) => {
     if (!user || !userDoc || planType === 'free' || isUpgrading) return;
