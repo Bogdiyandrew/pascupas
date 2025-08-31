@@ -183,7 +183,7 @@ export default function ChatPage() {
       setConversations((convos) => convos.map((c) => (c.id === id ? { ...c, title: newTitle } : c)));
       setEditingConversationId(null);
     } catch (error) {
-      console.error('Error renaming conversation:', error);
+      console.error('Eroare renaming conversation:', error);
     }
   };
 
