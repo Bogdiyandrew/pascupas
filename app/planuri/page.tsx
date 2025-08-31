@@ -28,7 +28,7 @@ const CreditCardIcon = () => (
   </svg>
 );
 const SuccessIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-green-500" viewBox="0 0 20 20" fill="currentColor">
     <path
       fillRule="evenodd"
       d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -156,6 +156,7 @@ function PlansPageClient() {
   const [isCanceling, setIsCanceling] = useState(false);
   const [stripeMessage, setStripeMessage] = useState<string | null>(null);
   const [cancelMessage, setCancelMessage] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -168,12 +169,11 @@ function PlansPageClient() {
     const canceled = searchParams.get('canceled');
 
     if (success) {
-      setStripeMessage('Plata a fost procesată cu succes! Vei fi redirecționat în scurt timp.');
-      // Redirecționare automată după 3 secunde
+      setShowSuccessModal(true);
       const timer = setTimeout(() => {
         router.push('/chat'); // Redirecționează către pagina de chat
-      }, 3000); 
-      return () => clearTimeout(timer); // Curăță timer-ul dacă componenta se demontează
+      }, 3000);
+      return () => clearTimeout(timer);
     } else if (canceled) {
       setStripeMessage('Plata a fost anulată. Te poți abona oricând dorești.');
     }
@@ -265,6 +265,23 @@ function PlansPageClient() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Afișează ecranul de succes
+  if (showSuccessModal) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-80">
+        <div className="bg-white rounded-xl shadow-2xl p-8 max-w-sm text-center transform scale-95 animate-scaleIn">
+          <SuccessIcon />
+          <h2 className="text-2xl font-bold text-gray-900 mt-4 mb-2">Plata a fost procesată cu succes!</h2>
+          <p className="text-gray-600 mb-6">Vei fi redirecționat către chat în scurt timp.</p>
+          <div className="flex justify-center items-center gap-2">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
+            <p className="text-sm text-gray-500">Redirecționare...</p>
+          </div>
+        </div>
       </div>
     );
   }
