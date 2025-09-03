@@ -161,7 +161,8 @@ export default function ChatPage() {
   const startNewConversation = () => {
     setActiveConversationId(null);
     setMessages([{ role: 'assistant', content: 'Salut! Sunt aici să te ascult. Cu ce te pot ajuta?' }]);
-    setShouldAutoScroll(true);
+    // CORECTAT: Am eliminat linia de mai jos
+    // setShouldAutoScroll(true); 
     if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
@@ -195,7 +196,8 @@ export default function ChatPage() {
       console.error('Error selecting conversation:', error);
     } finally {
       setIsLoading(false);
-      setTimeout(() => setShouldAutoScroll(true), 100);
+      // CORECTAT: Am eliminat linia de mai jos
+      // setTimeout(() => setShouldAutoScroll(true), 100);
     }
     if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
@@ -241,7 +243,8 @@ export default function ChatPage() {
       return;
     }
 
-    setShouldAutoScroll(true);
+    // CORECTAT: Am eliminat linia de mai jos
+    // setShouldAutoScroll(true);
 
     const userMessage: Message = { role: 'user', content: text };
     const currentDisplayMessages = [...messages, userMessage];
