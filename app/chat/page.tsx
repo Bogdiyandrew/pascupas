@@ -101,9 +101,6 @@ export default function ChatPage() {
   // Refs
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // =================================================================
-  // AICI ESTE MODIFICAREA CHEIE
-  // =================================================================
   const scrollToBottom = () => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTo({
@@ -426,7 +423,10 @@ export default function ChatPage() {
       </aside>
 
       {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col bg-white min-w-0">
+      {/* =============================================================== */}
+      {/* AICI ESTE MODIFICAREA CHEIE PENTRU LAYOUT */}
+      {/* =============================================================== */}
+      <main className="flex-1 flex flex-col bg-white min-w-0 h-screen">
         {/* Mobile Header - Fixed */}
         <div className="flex-shrink-0 p-4 border-b md:hidden flex items-center">
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2"><MenuIcon /></button>
@@ -460,7 +460,6 @@ export default function ChatPage() {
                 </div>
               </div>
             )}
-             {/* Am eliminat ref-ul de aici, nu mai este necesar */}
             <div />
           </div>
         </div>
