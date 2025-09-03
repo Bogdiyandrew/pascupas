@@ -16,7 +16,6 @@ import {
   updateDoc,
   addDoc,
 } from 'firebase/firestore';
-// import Header from '@/components/Header'; // <-- AM ȘTERS ACEASTĂ LINIE
 import { useAuth } from '@/context/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import { encryptText, decryptText, isChatCryptoReady } from '@/lib/cryptoChat';
@@ -55,7 +54,7 @@ function ConsentModal({ onAccept, onDecline, noStore, setNoStore }: { onAccept: 
       <div role="dialog" aria-modal="true" aria-labelledby="consent-title" className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl">
         <h2 id="consent-title" className="text-xl font-semibold mb-3">Înainte să începem</h2>
         <p className="text-sm text-gray-700 mb-3">Pentru a-ți răspunde, acest chat procesează mesajele tale cu ajutorul inteligenței artificiale. Informațiile sunt folosite doar pentru funcționarea serviciului și pot fi șterse la cerere. Serviciul <b>nu înlocuiește</b> consilierea unui psiholog.</p>
-        <p className="text-xs text-gray-600 mb-3">În urgență, sună la <b>112</b> sau la <a href="tel:0374456420" className="underline">DepreHUB 0374 456 420</a>. Detalii: <a href="/politica-confidentialitate" className="underline">Politica de confidențialitate</a> •{' '}<a href="/termeni" className="underline">Termeni și condiții</a>.</p>
+        <p className="text-xs text-gray-600 mb-3">În urgență, sună la <b>112</b> sau la <a href="tel:0800801200" className="underline">TelVerde Antisuicid 0800 801 200</a>. Detalii: <a href="/politica-confidentialitate" className="underline">Politica de confidențialitate</a> •{' '}<a href="/termeni" className="underline">Termeni și condiții</a>.</p>
         <label className="flex items-start gap-2 text-sm text-gray-800 mb-2">
           <input type="checkbox" className="mt-0.5 h-4 w-4" checked={noStore} onChange={(e) => { setNoStore(e.target.checked); localStorage.setItem('noStore', e.target.checked ? 'true' : 'false'); }} />
           <span><b>Mod privat</b>: nu salva conversațiile mele. <span className="text-gray-500">Nu voi avea istoric sau reluare.</span></span>
@@ -97,6 +96,16 @@ export default function ChatPage() {
   const [error, setError] = useState('');
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  // --- ÎMBUNĂTĂȚIRE SCROLL: Funcție centralizată pentru scroll ---
+  const scrollToBottom = useCallback(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, []);
+
   const updateUserProfile = useCallback(async (newProfileData: Record<string, unknown>) => {
     if (!user || !userDoc) return;
     try {
@@ -132,10 +141,11 @@ export default function ChatPage() {
       else fetchConversations();
     }
   }, [user, authLoading, router, fetchConversations]);
-
+  
+  // --- ÎMBUNĂTĂȚIRE SCROLL: Se apelează funcția de scroll la fiecare modificare a mesajelor ---
   useEffect(() => {
-    chatContainerRef.current?.scrollTo(0, chatContainerRef.current.scrollHeight);
-  }, [messages]);
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
   const startNewConversation = () => {
     setActiveConversationId(null);
@@ -235,100 +245,102 @@ export default function ChatPage() {
         }),
       });
 
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
         const errorText = await res.text();
         throw new Error(errorText || 'A apărut o eroare la server. Încearcă din nou.');
       }
       
       await incrementMessagesUsed();
+      
+      // --- REZOLVARE BUG: Procesăm răspunsul ca stream ---
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let fullResponse = '';
 
-      const aiResponseText = await res.text();
-      
-      const finalAssistantMessage: Message = { role: 'assistant', content: aiResponseText };
-      
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        const chunk = decoder.decode(value, { stream: true });
+        
+        if (chunk) {
+          fullResponse += chunk;
+          setMessages(prevMessages => {
+            const newMessages = [...prevMessages];
+            newMessages[newMessages.length - 1].content += chunk;
+            return newMessages;
+          });
+        }
+      }
+      // --- Sfârșit rezolvare bug ---
+
       if (!noStore && cryptoReady) {
         if (!isChatCryptoReady()) {
           setError('Criptarea nu mai este disponibilă. Te rog să te re-loghezi.');
-          setIsLoading(false);
           return;
         }
 
         const userEncryption = await encryptText(userMessage.content);
-        const assistantEncryption = await encryptText(finalAssistantMessage.content);
+        const assistantEncryption = await encryptText(fullResponse);
         
-        if (!userEncryption?.ciphertext || !userEncryption?.iv || 
-            !assistantEncryption?.ciphertext || !assistantEncryption?.iv) {
+        if (!userEncryption?.ciphertext || !userEncryption?.iv || !assistantEncryption?.ciphertext || !assistantEncryption?.iv) {
           setError('Eroare la criptarea mesajelor. Verifică dacă ești conectat și încearcă din nou.');
-          setIsLoading(false);
           return;
         }
 
         const { ciphertext: userCiphertext, iv: userIv } = userEncryption;
         const { ciphertext: assistantCiphertext, iv: assistantIv } = assistantEncryption;
-
-        const finalUserMessageForState = { ...userMessage, contentEnc: userCiphertext, iv: userIv };
-        const finalAssistantMessageForState = { ...finalAssistantMessage, contentEnc: assistantCiphertext, iv: assistantIv };
-
-        setMessages([...messages, finalUserMessageForState, finalAssistantMessageForState]);
-
-        const previousMessagesToStore = messages
-          .filter(msg => msg.contentEnc && msg.iv && msg.role)
-          .map(msg => ({
-            role: msg.role,
-            contentEnc: msg.contentEnc!,
-            iv: msg.iv!
-          }));
         
-        const userMessageToStore = {
-          role: 'user' as const,
-          contentEnc: userCiphertext,
-          iv: userIv
-        };
-        
-        const assistantMessageToStore = {
-          role: 'assistant' as const,
-          contentEnc: assistantCiphertext,
-          iv: assistantIv
-        };
+        // Actualizăm starea finală cu datele criptate
+        setMessages(prev => {
+            const newMessages = [...prev];
+            const userMsgIndex = newMessages.length - 2;
+            const assistantMsgIndex = newMessages.length - 1;
+            
+            if(newMessages[userMsgIndex]) {
+                newMessages[userMsgIndex].contentEnc = userCiphertext;
+                newMessages[userMsgIndex].iv = userIv;
+            }
+            if(newMessages[assistantMsgIndex]) {
+                newMessages[assistantMsgIndex].contentEnc = assistantCiphertext;
+                newMessages[assistantMsgIndex].iv = assistantIv;
+            }
+            return newMessages;
+        });
 
+        // Logica pentru salvare în Firestore rămâne similară, folosind datele criptate
+        const userMessageToStore = { role: 'user' as const, contentEnc: userCiphertext, iv: userIv };
+        const assistantMessageToStore = { role: 'assistant' as const, contentEnc: assistantCiphertext, iv: assistantIv };
         const finalMessagesToStore = [
-          ...previousMessagesToStore,
+          ...messages.slice(0, -1).filter(m => m.contentEnc).map(m => ({role: m.role, contentEnc: m.contentEnc!, iv: m.iv!})),
           userMessageToStore,
           assistantMessageToStore,
         ];
         
         try {
           if (activeConversationId) {
-            const docRef = doc(db, 'conversations', activeConversationId);
-            const updateData = { 
-              messages: finalMessagesToStore, 
-              updatedAt: new Date()
-            };
-            await updateDoc(docRef, updateData);
+            await updateDoc(doc(db, 'conversations', activeConversationId), { messages: finalMessagesToStore, updatedAt: new Date() });
           } else {
-            const newTitle = userMessage.content.substring(0, 40) + (userMessage.content.length > 40 ? '…' : '');
+            const newTitle = userMessage.content.substring(0, 40) + '…';
             const now = new Date();
-            const data = { 
+            const docRef = await addDoc(collection(db, 'conversations'), { 
               userId: user.uid, 
               title: newTitle, 
               messages: finalMessagesToStore, 
               createdAt: now,
               updatedAt: now
-            };
-            const docRef = await addDoc(collection(db, 'conversations'), data);
+            });
             setActiveConversationId(docRef.id);
           }
           await fetchConversations();
-        } catch (firestoreError: unknown) {
+        } catch (firestoreError) {
           console.error('Firestore error:', firestoreError);
-          const errorMessage = firestoreError instanceof Error ? firestoreError.message : 'Eroare necunoscută';
-          setError(`Eroare la salvare în baza de date: ${errorMessage}`);
+          setError('Eroare la salvarea conversației.');
         }
-      } else {
-        setMessages([...messages, userMessage, finalAssistantMessage]);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'A apărut o eroare necunoscută.');
+      setMessages(prev => prev.slice(0, -1)); // Elimină placeholder-ul de mesaj gol în caz de eroare
     } finally {
       setIsLoading(false);
     }
@@ -353,12 +365,6 @@ export default function ChatPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-lg font-medium">Se inițializează criptarea securizată...</p>
-          <p className="text-sm text-gray-500 mt-2">
-            Acest proces poate dura câteva secunde.
-          </p>
-          <p className="text-xs text-gray-400 mt-2">
-            Dacă persistă, încearcă să te re-loghezi.
-          </p>
         </div>
       </div>
     );
@@ -366,10 +372,7 @@ export default function ChatPage() {
   
   if (!hasConsented) {
     return (
-      <>
-        {/* <Header /> // <-- AM ȘTERS ACEASTĂ LINIE */}
-        <ConsentModal onAccept={() => { setHasConsented(true); localStorage.setItem('gdprConsent', 'true'); }} onDecline={() => router.push('/')} noStore={noStore} setNoStore={setNoStore} />
-      </>
+      <ConsentModal onAccept={() => { setHasConsented(true); localStorage.setItem('gdprConsent', 'true'); }} onDecline={() => router.push('/')} noStore={noStore} setNoStore={setNoStore} />
     );
   }
 
@@ -423,10 +426,10 @@ export default function ChatPage() {
                 ))}
               </div>
             )}
-            {isLoading && messages[messages.length - 1]?.content === '' && (
+            {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-gray-200 text-text rounded-2xl p-4 rounded-bl-none">
-                  <span className="animate-pulse">AI scrie…</span>
+                  {messages[messages.length - 1]?.content === '' && <span className="animate-pulse">AI scrie…</span>}
                 </div>
               </div>
             )}
