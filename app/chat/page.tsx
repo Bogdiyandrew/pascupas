@@ -370,9 +370,10 @@ export default function ChatPage() {
   const displayRemaining = remainingMessages === -1 || remainingMessages === Infinity ? 'Nelimitate' : remainingMessages;
 
   return (
-    // --- REZOLVARE LAYOUT: Am înlocuit h-full cu h-0 și flex-grow pentru a forța containerul să ocupe spațiul rămas ---
-    <div className="flex flex-1 h-full relative overflow-hidden">
+    <div className="flex h-screen relative overflow-hidden">
       {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-20 md:hidden"></div>}
+      
+      {/* Sidebar */}
       <aside className={`absolute top-0 left-0 h-full w-3/4 max-w-xs md:w-1/4 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out bg-background border-r border-gray-200 p-6 flex flex-col z-30`}>
         <button onClick={startNewConversation} className="flex items-center justify-center gap-2 w-full bg-primary text-white font-bold p-3 rounded-lg hover:bg-opacity-90 transition-colors mb-4">
           <PlusIcon /> Conversație Nouă
@@ -385,7 +386,7 @@ export default function ChatPage() {
           <p className="text-[11px] text-gray-500 mt-1">Nu înlocuiește un psiholog. În criză, sună la 112.</p>
           <p className="text-xs text-gray-600 mt-2 font-medium">Mesaje rămase luna aceasta: {displayRemaining}</p>
         </div>
-        <div className="flex-grow overflow-y-auto pr-2">
+        <div className="flex-1 overflow-y-auto pr-2 min-h-0">
           <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2"><HistoryIcon /> Istoric</h2>
           {!noStore ? (
             <div className="space-y-2">
@@ -396,36 +397,45 @@ export default function ChatPage() {
           ) : (<div className="text-xs text-gray-500">Istoricul e dezactivat.</div>)}
         </div>
       </aside>
-      <main className="w-full md:w-3/4 flex flex-col bg-white h-full">
-        <div className="p-4 border-b md:hidden flex items-center">
+
+      {/* Main Chat Area */}
+      <main className="flex-1 flex flex-col bg-white min-w-0">
+        {/* Mobile Header - Fixed */}
+        <div className="flex-shrink-0 p-4 border-b md:hidden flex items-center">
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2"><MenuIcon /></button>
           <h2 className="font-bold text-lg">Chat</h2>
         </div>
-        <div className="flex-grow p-4 md:p-6 space-y-4 overflow-y-auto">
-          {messages.map((msg, index) => (
-            <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-lg md:max-w-xl p-3 md:p-4 rounded-2xl prose prose-sm ${msg.role === 'user' ? 'bg-primary text-white rounded-br-none prose-invert' : 'bg-gray-200 text-text rounded-bl-none'}`}>
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+
+        {/* Messages Area - Scrollable */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="p-4 md:p-6 space-y-4">
+            {messages.map((msg, index) => (
+              <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-lg md:max-w-xl p-3 md:p-4 rounded-2xl prose prose-sm ${msg.role === 'user' ? 'bg-primary text-white rounded-br-none prose-invert' : 'bg-gray-200 text-text rounded-bl-none'}`}>
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                </div>
               </div>
-            </div>
-          ))}
-          {messages.length <= 1 && (
-            <div className="flex flex-wrap gap-2 mt-2 justify-center">
-              {startSuggestions.map((s, i) => (
-                <button key={i} onClick={() => handleSuggestionClick(s)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-full text-sm text-gray-700 border">{s}</button>
-              ))}
-            </div>
-          )}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-200 text-text rounded-2xl p-4 rounded-bl-none">
-                {messages[messages.length - 1]?.content === '' && <span className="animate-pulse">AI scrie…</span>}
+            ))}
+            {messages.length <= 1 && (
+              <div className="flex flex-wrap gap-2 mt-2 justify-center">
+                {startSuggestions.map((s, i) => (
+                  <button key={i} onClick={() => handleSuggestionClick(s)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-full text-sm text-gray-700 border">{s}</button>
+                ))}
               </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
+            )}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-200 text-text rounded-2xl p-4 rounded-bl-none">
+                  {messages[messages.length - 1]?.content === '' && <span className="animate-pulse">AI scrie…</span>}
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
-        <div className="p-4 md:p-6 bg-white border-t">
+
+        {/* Input Area - Fixed */}
+        <div className="flex-shrink-0 p-4 md:p-6 bg-white border-t">
           {noStore && <PrivateModeIndicator />}
           <form id="chatForm" onSubmit={handleSubmit} className="flex items-center space-x-2 md:space-x-4">
             <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={canSendMessage() ? "Scrie mesajul tău aici..." : "Ai atins limita de mesaje."} className="w-full p-3 md:p-4 border rounded-full bg-white text-black placeholder-gray-500 focus:ring-2 focus:ring-primary transition-shadow" disabled={isLoading || !canSendMessage()} />
@@ -448,6 +458,8 @@ export default function ChatPage() {
           </div>
         </div>
       </main>
+
+      {/* Delete Confirmation Modal */}
       {conversationToDelete && !noStore && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm mx-4">
@@ -504,4 +516,3 @@ function ConversationItem({ convo, isActive, isEditing, onSelect, onStartEdit, o
     </div>
   );
 }
-
