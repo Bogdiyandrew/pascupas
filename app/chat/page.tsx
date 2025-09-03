@@ -423,10 +423,7 @@ export default function ChatPage() {
       </aside>
 
       {/* Main Chat Area */}
-      {/* =============================================================== */}
-      {/* AICI ESTE MODIFICAREA CHEIE PENTRU LAYOUT */}
-      {/* =============================================================== */}
-      <main className="flex-1 flex flex-col bg-white min-w-0 h-screen">
+      <main className="flex-1 flex flex-col bg-white min-w-0">
         {/* Mobile Header - Fixed */}
         <div className="flex-shrink-0 p-4 border-b md:hidden flex items-center">
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2"><MenuIcon /></button>
@@ -465,7 +462,7 @@ export default function ChatPage() {
         </div>
 
         {/* Input Area - Fixed */}
-        <div className="flex-shrink-0 p-4 md:p-6 bg-white border-t">
+        <div className="flex-shrink-0 px-4 pt-4 pb-8 md:px-6 md:pt-6 md:pb-12 bg-white border-t">
           {noStore && <PrivateModeIndicator />}
           <form id="chatForm" onSubmit={handleSubmit} className="flex items-center space-x-2 md:space-x-4">
             <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={canSendMessage() ? "Scrie mesajul tău aici..." : "Ai atins limita de mesaje."} className="w-full p-3 md:p-4 border rounded-full bg-white text-black placeholder-gray-500 focus:ring-2 focus:ring-primary transition-shadow" disabled={isLoading || !canSendMessage()} />
