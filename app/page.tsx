@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Header from '@/components/Header';
+import Header from '@/components/Header'; 
 import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 import AuthModal from '@/components/AuthModal';
@@ -86,23 +86,6 @@ const SocialProofSection = () => (
     </section>
 );
 
-const Footer = () => (
-  <footer className="py-10 px-4 text-center text-gray-500 text-sm border-t bg-white">
-    <div className="container mx-auto">
-      <p className="font-bold mb-2 text-gray-700">Disclaimer Legal</p>
-      <p className="max-w-2xl mx-auto mb-4">
-        Acest serviciu este un instrument de suport emoțional și nu înlocuiește terapia medicală sau consultul unui specialist licențiat. Pentru probleme grave de sănătate mintală, vă rugăm să consultați un medic sau un psihoterapeut.
-      </p>
-      <div className="space-x-4">
-        <Link href="/politica-confidentialitate" className="hover:text-primary">Politică de Confidențialitate</Link>
-        <span>|</span>
-        <Link href="/termeni" className="hover:text-primary">Termeni și Condiții</Link>
-      </div>
-       <p className="mt-6 text-gray-400">&copy; {new Date().getFullYear()} PascuPas.online. Toate drepturile rezervate.</p>
-    </div>
-  </footer>
-);
-
 export default function HomePage() {
   return (
     <div className="bg-background text-text">
@@ -112,7 +95,6 @@ export default function HomePage() {
         <BenefitsSection />
         <SocialProofSection />
       </main>
-      <Footer />
     </div>
   );
 }

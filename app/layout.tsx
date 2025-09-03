@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Poppins, Inter } from "next/font/google";
-import { AuthProvider } from "@/context/AuthContext"; // Importăm provider-ul
+import { AuthProvider } from "@/context/AuthContext";
+import Header from "@/components/Header"; // Asigură-te că Header este importat
+import Footer from "@/components/Footer"; // Asigură-te că noul Footer este importat
 import "./globals.css";
 
 const poppins = Poppins({
@@ -26,13 +28,17 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode; // Corectat: React.Node -> React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
     <html lang="ro">
-      <body className={`${poppins.variable} ${inter.variable} bg-background font-inter antialiased`}>
-        <AuthProvider> {/* Învelim totul în AuthProvider */}
-          {children}
+      <body className={`${poppins.variable} ${inter.variable} bg-background font-inter antialiased flex flex-col min-h-screen`}>
+        <AuthProvider>
+          <Header />
+          <main className="flex-grow">
+            {children}
+          </main>
+          <Footer />
         </AuthProvider>
       </body>
     </html>
