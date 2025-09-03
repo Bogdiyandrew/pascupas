@@ -94,17 +94,20 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // --- REZOLVARE SCROLL: Pasul 1 -> Adăugăm referințe pentru container și pentru elementul ancoră ---
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // --- ÎMBUNĂTĂȚIRE SCROLL: Funcție centralizată pentru scroll ---
-  const scrollToBottom = useCallback(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
-    }
-  }, []);
+  // --- REZOLVARE SCROLL: Pasul 2 -> Creăm funcția de scroll ---
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+  
+  // --- REZOLVARE SCROLL: Pasul 3 -> Apelăm funcția de scroll la fiecare modificare ---
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const updateUserProfile = useCallback(async (newProfileData: Record<string, unknown>) => {
     if (!user || !userDoc) return;
@@ -141,11 +144,6 @@ export default function ChatPage() {
       else fetchConversations();
     }
   }, [user, authLoading, router, fetchConversations]);
-  
-  // --- ÎMBUNĂTĂȚIRE SCROLL: Se apelează funcția de scroll la fiecare modificare a mesajelor ---
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
 
   const startNewConversation = () => {
     setActiveConversationId(null);
@@ -252,7 +250,6 @@ export default function ChatPage() {
       
       await incrementMessagesUsed();
       
-      // --- REZOLVARE BUG: Procesăm răspunsul ca stream ---
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let done = false;
@@ -267,12 +264,11 @@ export default function ChatPage() {
           fullResponse += chunk;
           setMessages(prevMessages => {
             const newMessages = [...prevMessages];
-            newMessages[newMessages.length - 1].content += chunk;
+            newMessages[newMessages.length - 1].content = fullResponse;
             return newMessages;
           });
         }
       }
-      // --- Sfârșit rezolvare bug ---
 
       if (!noStore && cryptoReady) {
         if (!isChatCryptoReady()) {
@@ -291,7 +287,6 @@ export default function ChatPage() {
         const { ciphertext: userCiphertext, iv: userIv } = userEncryption;
         const { ciphertext: assistantCiphertext, iv: assistantIv } = assistantEncryption;
         
-        // Actualizăm starea finală cu datele criptate
         setMessages(prev => {
             const newMessages = [...prev];
             const userMsgIndex = newMessages.length - 2;
@@ -308,7 +303,6 @@ export default function ChatPage() {
             return newMessages;
         });
 
-        // Logica pentru salvare în Firestore rămâne similară, folosind datele criptate
         const userMessageToStore = { role: 'user' as const, contentEnc: userCiphertext, iv: userIv };
         const assistantMessageToStore = { role: 'assistant' as const, contentEnc: assistantCiphertext, iv: assistantIv };
         const finalMessagesToStore = [
@@ -340,7 +334,7 @@ export default function ChatPage() {
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'A apărut o eroare necunoscută.');
-      setMessages(prev => prev.slice(0, -1)); // Elimină placeholder-ul de mesaj gol în caz de eroare
+      setMessages(prev => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
     }
@@ -433,6 +427,8 @@ export default function ChatPage() {
                 </div>
               </div>
             )}
+            {/* --- REZOLVARE SCROLL: Pasul 4 -> Adăugăm elementul ancoră la finalul listei --- */}
+            <div ref={messagesEndRef} />
           </div>
           <div className="p-4 md:p-6 bg-white border-t">
             {noStore && <PrivateModeIndicator />}
@@ -514,3 +510,4 @@ function ConversationItem({ convo, isActive, isEditing, onSelect, onStartEdit, o
     </div>
   );
 }
+
