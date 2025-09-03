@@ -82,6 +82,8 @@ const PrivateModeIndicator = () => (
 export default function ChatPage() {
   const { user, userDoc, loading: authLoading, cryptoReady, canSendMessage, incrementMessagesUsed, getMessagesRemaining } = useAuth();
   const router = useRouter();
+  
+  // States
   const [hasConsented, setHasConsented] = useState(false);
   const [noStore, setNoStore] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{ role: 'assistant', content: 'Salut! Sunt aici să te ascult. Cu ce te pot ajuta?' }]);
@@ -94,16 +96,31 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   
+  // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
+  // Functions
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  const handleScroll = () => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollButton(!isNearBottom);
+    }
+  };
   
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (shouldAutoScroll) {
+      scrollToBottom();
+    }
+  }, [messages, shouldAutoScroll]);
 
   const updateUserProfile = useCallback(async (newProfileData: Record<string, unknown>) => {
     if (!user || !userDoc) return;
@@ -144,6 +161,7 @@ export default function ChatPage() {
   const startNewConversation = () => {
     setActiveConversationId(null);
     setMessages([{ role: 'assistant', content: 'Salut! Sunt aici să te ascult. Cu ce te pot ajuta?' }]);
+    setShouldAutoScroll(true);
     if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
@@ -153,6 +171,8 @@ export default function ChatPage() {
     if (noStore) return;
 
     setIsLoading(true);
+    setShouldAutoScroll(false);
+    
     try {
       const docRef = doc(db, 'conversations', id);
       const snap = await getDoc(docRef);
@@ -175,6 +195,7 @@ export default function ChatPage() {
       console.error('Error selecting conversation:', error);
     } finally {
       setIsLoading(false);
+      setTimeout(() => setShouldAutoScroll(true), 100);
     }
     if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
@@ -219,6 +240,8 @@ export default function ChatPage() {
       setError('Criptarea nu este încă disponibilă. Te rog să aștepți sau să te re-loghezi.');
       return;
     }
+
+    setShouldAutoScroll(true);
 
     const userMessage: Message = { role: 'user', content: text };
     const currentDisplayMessages = [...messages, userMessage];
@@ -407,7 +430,11 @@ export default function ChatPage() {
         </div>
 
         {/* Messages Area - Scrollable */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div 
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto min-h-0 relative"
+        >
           <div className="p-4 md:p-6 space-y-4">
             {messages.map((msg, index) => (
               <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -432,6 +459,22 @@ export default function ChatPage() {
             )}
             <div ref={messagesEndRef} />
           </div>
+          
+          {/* Scroll to Bottom Button */}
+          {showScrollButton && (
+            <button
+              onClick={() => {
+                scrollToBottom();
+                setShowScrollButton(false);
+              }}
+              className="fixed bottom-24 right-6 bg-primary text-white p-3 rounded-full shadow-lg hover:bg-opacity-90 transition-all z-10"
+              aria-label="Scroll to bottom"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Input Area - Fixed */}
