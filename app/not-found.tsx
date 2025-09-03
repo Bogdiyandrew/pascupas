@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import Header from '@/components/Header';
+// import Header from '@/components/Header'; // <-- AM ȘTERS ACEASTĂ LINIE
 
 const NotFoundPage = () => {
   return (
-    <div className="bg-background text-text min-h-screen flex flex-col">
-      <Header />
+    <div className="bg-background text-text min-h-full flex flex-col">
+      {/* <Header /> // <-- AM ȘTERS ACEASTĂ LINIE */}
       <main className="flex-grow flex items-center justify-center text-center px-4">
         <div className="container mx-auto max-w-xl">
           <h1 className="font-poppins font-extrabold text-6xl md:text-9xl text-primary mb-4">

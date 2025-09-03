@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Header from '@/components/Header'; 
+// import Header from '@/components/Header'; // <-- ȘTERGE ACEASTĂ LINIE
 import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 import AuthModal from '@/components/AuthModal';
@@ -88,13 +88,13 @@ const SocialProofSection = () => (
 
 export default function HomePage() {
   return (
-    <div className="bg-background text-text">
-      <Header />
+    // <div className="bg-background text-text"> // <-- Poți șterge și acest div dacă dorești
+      // <Header /> // <-- ȘTERGE ACEASTĂ LINIE
       <main>
         <HeroSection />
         <BenefitsSection />
         <SocialProofSection />
       </main>
-    </div>
+    // </div>
   );
 }

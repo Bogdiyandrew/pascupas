@@ -16,7 +16,7 @@ import {
   updateDoc,
   addDoc,
 } from 'firebase/firestore';
-import Header from '@/components/Header';
+// import Header from '@/components/Header'; // <-- AM ȘTERS ACEASTĂ LINIE
 import { useAuth } from '@/context/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import { encryptText, decryptText, isChatCryptoReady } from '@/lib/cryptoChat';
@@ -367,7 +367,7 @@ export default function ChatPage() {
   if (!hasConsented) {
     return (
       <>
-        <Header />
+        {/* <Header /> // <-- AM ȘTERS ACEASTĂ LINIE */}
         <ConsentModal onAccept={() => { setHasConsented(true); localStorage.setItem('gdprConsent', 'true'); }} onDecline={() => router.push('/')} noStore={noStore} setNoStore={setNoStore} />
       </>
     );
@@ -378,8 +378,7 @@ export default function ChatPage() {
 
   return (
     <>
-      <Header />
-      <div className="flex h-[calc(100vh-88px)] relative overflow-hidden">
+      <div className="flex h-full relative overflow-hidden">
         {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-20 md:hidden"></div>}
         <aside className={`absolute top-0 left-0 h-full w-3/4 max-w-xs md:w-1/4 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out bg-background border-r border-gray-200 p-6 flex flex-col z-30`}>
           <button onClick={startNewConversation} className="flex items-center justify-center gap-2 w-full bg-primary text-white font-bold p-3 rounded-lg hover:bg-opacity-90 transition-colors mb-4">
