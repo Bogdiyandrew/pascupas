@@ -96,8 +96,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
-  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(false); // Default la false
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -107,20 +106,24 @@ export default function ChatPage() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-
-  const handleScroll = () => {
-    if (messagesContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-      setShowScrollButton(!isNearBottom);
-    }
-  };
   
+  // Noul useEffect pentru auto-scroll inteligent
   useEffect(() => {
-    if (shouldAutoScroll) {
-      scrollToBottom();
+    if (messagesContainerRef.current) {
+      const { scrollHeight, clientHeight, scrollTop } = messagesContainerRef.current;
+      // Verificăm dacă utilizatorul era deja aproape de jos
+      const wasNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      
+      // Derulăm la fund DOAR dacă:
+      // 1. shouldAutoScroll este true (setat de sendMessage la adăugarea de mesaje noi)
+      // 2. sau, dacă mesajele sunt puține (la începutul unei conversații noi sau după selectare)
+      // 3. sau, dacă utilizatorul era deja aproape de fund și se adaugă un mesaj nou
+      if (shouldAutoScroll || messages.length <= 2 || wasNearBottom) {
+        scrollToBottom();
+      }
     }
   }, [messages, shouldAutoScroll]);
+
 
   const updateUserProfile = useCallback(async (newProfileData: Record<string, unknown>) => {
     if (!user || !userDoc) return;
@@ -161,8 +164,7 @@ export default function ChatPage() {
   const startNewConversation = () => {
     setActiveConversationId(null);
     setMessages([{ role: 'assistant', content: 'Salut! Sunt aici să te ascult. Cu ce te pot ajuta?' }]);
-    // CORECTAT: Am eliminat linia de mai jos
-    // setShouldAutoScroll(true); 
+    setShouldAutoScroll(false); // Nu derulăm automat la începutul unei conversații noi
     if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
@@ -172,7 +174,7 @@ export default function ChatPage() {
     if (noStore) return;
 
     setIsLoading(true);
-    setShouldAutoScroll(false);
+    setShouldAutoScroll(false); // Nu derulăm automat la selectarea unei conversații vechi
     
     try {
       const docRef = doc(db, 'conversations', id);
@@ -196,8 +198,6 @@ export default function ChatPage() {
       console.error('Error selecting conversation:', error);
     } finally {
       setIsLoading(false);
-      // CORECTAT: Am eliminat linia de mai jos
-      // setTimeout(() => setShouldAutoScroll(true), 100);
     }
     if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
@@ -242,9 +242,16 @@ export default function ChatPage() {
       setError('Criptarea nu este încă disponibilă. Te rog să aștepți sau să te re-loghezi.');
       return;
     }
-
-    // CORECTAT: Am eliminat linia de mai jos
-    // setShouldAutoScroll(true);
+    
+    // Logică inteligentă pentru auto-scroll:
+    // Derulăm automat dacă containerul este deja la fund sau aproape de fund
+    if (messagesContainerRef.current) {
+        const { scrollHeight, clientHeight, scrollTop } = messagesContainerRef.current;
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 100; // Toleranță de 100px
+        setShouldAutoScroll(isNearBottom);
+    } else {
+        setShouldAutoScroll(true); // Dacă ref-ul nu e gata, presupunem că vrem să derulăm
+    }
 
     const userMessage: Message = { role: 'user', content: text };
     const currentDisplayMessages = [...messages, userMessage];
@@ -359,6 +366,7 @@ export default function ChatPage() {
       setMessages(prev => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
+      setShouldAutoScroll(false); // Resetăm după ce s-a terminat de încărcat răspunsul
     }
   }
 
@@ -435,7 +443,6 @@ export default function ChatPage() {
         {/* Messages Area - Scrollable */}
         <div 
           ref={messagesContainerRef}
-          onScroll={handleScroll}
           className="flex-1 overflow-y-auto min-h-0 relative"
         >
           <div className="p-4 md:p-6 space-y-4">
@@ -463,21 +470,7 @@ export default function ChatPage() {
             <div ref={messagesEndRef} />
           </div>
           
-          {/* Scroll to Bottom Button */}
-          {showScrollButton && (
-            <button
-              onClick={() => {
-                scrollToBottom();
-                setShowScrollButton(false);
-              }}
-              className="fixed bottom-24 right-6 bg-primary text-white p-3 rounded-full shadow-lg hover:bg-opacity-90 transition-all z-10"
-              aria-label="Scroll to bottom"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-              </svg>
-            </button>
-          )}
+          {/* Butonul de "Scroll to Bottom" a fost eliminat */}
         </div>
 
         {/* Input Area - Fixed */}
