@@ -6,7 +6,9 @@ import {
   signOut, 
   onIdTokenChanged,
   User,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  reauthenticateWithCredential,
+  EmailAuthProvider
 } from 'firebase/auth';
 import { doc, setDoc, updateDoc, Timestamp, onSnapshot, DocumentReference } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -21,7 +23,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
-  
+  reauthenticateUser: (password: string) => Promise<void>; // Funcția nouă
   canSendMessage: () => boolean;
   getMessagesRemaining: () => number;
   getCurrentPlan: () => string;
@@ -73,6 +75,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const reauthenticateUser = async (password: string) => {
+    if (!user || !user.email) {
+      throw new Error("Niciun utilizator nu este autentificat sau email-ul lipsește.");
+    }
+    const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
+  };
+  
   const updateUserProfile = async (newProfileData: Partial<FirebaseUser['profileData']>): Promise<void> => {
     if (!user) return;
     try {
@@ -86,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('❌ Eroare la actualizarea profilului:', error);
     }
-};
+  };
 
   useEffect(() => {
     let unsubscribeFromFirestore: (() => void) | null = null;
@@ -183,11 +193,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       logout,
       sendPasswordReset,
+      reauthenticateUser,
       canSendMessage: canSendMessageCheck,
       getMessagesRemaining: getMessagesRemainingCount,
       getCurrentPlan,
       incrementMessagesUsed,
-      updateUserProfile // Aici se expune noua funcție
+      updateUserProfile
     }}>
       {children}
     </AuthContext.Provider>
