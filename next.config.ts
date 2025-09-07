@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
         tls: false,
         stream: false,
         fs: false,
+        crypto: false, // adaugă și crypto dacă folosești pachete care îl cer
       };
     }
 
