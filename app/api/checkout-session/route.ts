@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { NextRequest, NextResponse } from 'next/server';
-import { isPlanType, PLANS, PlanType } from '@/types/subscription';
+import { isPlanType, PlanType } from '@/types/subscription';
 import { adminAuth } from '@/lib/firebaseAdmin'; // Importă adminAuth
 
 // Inițializează Stripe cu cheia secretă din variabilele de mediu.
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (error: unknown) {
     console.error('[STRIPE_CHECKOUT_ERROR]', error);
-    if (error instanceof Error && 'code' in error && (error as any).code === 'auth/id-token-expired') {
+    if (error instanceof Error && 'code' in error && (error as { code: string }).code === 'auth/id-token-expired') {
         return new NextResponse('Sesiunea a expirat. Te rugăm să te re-autentifici.', { status: 401 });
     }
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Eroare internă de server.' }, { status: 500 });

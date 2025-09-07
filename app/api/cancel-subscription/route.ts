@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
 
   } catch (error: unknown) {
     console.error('[CANCEL_API] Unexpected error:', error);
-    if (error instanceof Error && 'code' in error && (error as any).code === 'auth/id-token-expired') {
+    if (error instanceof Error && 'code' in error && (error as { code: string }).code === 'auth/id-token-expired') {
         return new NextResponse('Sesiunea a expirat. Te rugăm să te re-autentifici.', { status: 401 });
     }
     const errorMessage = error instanceof Error ? error.message : 'Eroare internă de server necunoscută.';

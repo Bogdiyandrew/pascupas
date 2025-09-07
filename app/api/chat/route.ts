@@ -1,8 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import OpenAI from 'openai';
 import { adminAuth } from '@/lib/firebaseAdmin'; // Importă adminAuth
-
-// export const runtime = 'edge'; // latență mică
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -105,7 +103,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: unknown) {
     console.error('[CHAT_API_ERROR]', error);
-    if (error instanceof Error && 'code' in error && (error as any).code === 'auth/id-token-expired') {
+    if (error instanceof Error && 'code' in error && (error as { code: string }).code === 'auth/id-token-expired') {
         return new Response('Sesiunea a expirat. Te rugăm să te re-autentifici.', { status: 401 });
     }
     const errorMessage = error instanceof Error ? error.message : 'Eroare internă de server necunoscută.';
