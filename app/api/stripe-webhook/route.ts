@@ -6,7 +6,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { Resend } from 'resend'; // Importă Resend
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-07-30.basil',
+  apiVersion: '2025-08-27.basil', // <-- Aici a fost corectată versiunea
 });
 
 const resend = new Resend(process.env.RESEND_API_KEY); // Inițializează clientul Resend
