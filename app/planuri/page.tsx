@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
-import { PLANS, PlanType } from '@/types/subscription';
+import { useAuth } from '../../context/AuthContext';
+import { PLANS, PlanType } from '../../types/subscription';
 import { Suspense } from 'react';
 
 // Iconițe
@@ -446,3 +446,4 @@ export default function Page() {
     </Suspense>
   );
 }
+
