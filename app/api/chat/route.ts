@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { adminAuth } from '@/lib/firebaseAdmin'; // Importă adminAuth
 
-export const runtime = 'edge'; // latență mică
+// export const runtime = 'edge'; // latență mică
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
