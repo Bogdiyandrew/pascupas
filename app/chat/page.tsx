@@ -252,9 +252,13 @@ export default function ChatPage() {
     setError('');
 
     try {
+      const token = await user.getIdToken();
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           messages: currentDisplayMessages.map(({ role, content }) => ({ role, content })),
           profileData: userDoc?.profileData,

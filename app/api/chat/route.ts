@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { adminAuth } from '@/lib/firebaseAdmin'; // Importă adminAuth
 
 export const runtime = 'edge'; // latență mică
 
@@ -29,7 +30,20 @@ Dacă discuția devine critică (gânduri suicidale sau risc iminent), încuraje
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, profileData } = await req.json();
+    const authorization = req.headers.get('Authorization');
+    if (!authorization?.startsWith('Bearer ')) {
+        return new Response('Lipsă token de autorizare.', { status: 401 });
+    }
+
+    const idToken = authorization.split('Bearer ')[1];
+    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    const authenticatedUserId = decodedToken.uid;
+    
+    const { messages, profileData, userId } = await req.json();
+    
+    if(authenticatedUserId !== userId) {
+        return new Response('Acțiune neautorizată.', { status: 403 });
+    }
 
     if (!messages || !Array.isArray(messages)) {
       return new Response('Lipsesc mesajele din request.', { status: 400 });
@@ -91,6 +105,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: unknown) {
     console.error('[CHAT_API_ERROR]', error);
+    if (error instanceof Error && 'code' in error && (error as any).code === 'auth/id-token-expired') {
+        return new Response('Sesiunea a expirat. Te rugăm să te re-autentifici.', { status: 401 });
+    }
     const errorMessage = error instanceof Error ? error.message : 'Eroare internă de server necunoscută.';
     return new Response(`Eroare internă de server: ${errorMessage}`, { status: 500 });
   }

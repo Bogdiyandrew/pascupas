@@ -187,9 +187,13 @@ function PlansPageClient() {
     setCancelMessage(null);
   
     try {
+      const token = await user.getIdToken();
       const res = await fetch('/api/checkout-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           planId: planType,
           userId: user.uid,
@@ -197,12 +201,12 @@ function PlansPageClient() {
         }),
       });
   
-      const { url } = await res.json();
+      const { url, error } = await res.json();
   
-      if (url) {
+      if (res.ok && url) {
         router.push(url);
       } else {
-        throw new Error('Nu s-a putut obține URL-ul de checkout.');
+        throw new Error(error || 'Nu s-a putut obține URL-ul de checkout.');
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Eroare la crearea sesiunii de plată.';
@@ -236,9 +240,13 @@ function PlansPageClient() {
     setStripeMessage(null);
 
     try {
+        const token = await user.getIdToken();
         const res = await fetch('/api/cancel-subscription', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify({
                 stripeSubscriptionId: userDoc.stripeSubscriptionId,
                 userId: user.uid,

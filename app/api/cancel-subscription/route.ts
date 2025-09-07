@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { adminDb } from '@/lib/firebaseAdmin'; 
+import { adminDb, adminAuth } from '@/lib/firebaseAdmin'; 
 import { PLANS } from '@/types/subscription';
 import { Timestamp } from 'firebase-admin/firestore';
 
@@ -10,7 +10,21 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(req: NextRequest) {
   try {
+    const authorization = req.headers.get('Authorization');
+    if (!authorization?.startsWith('Bearer ')) {
+        return new NextResponse('Lipsă token de autorizare.', { status: 401 });
+    }
+
+    const idToken = authorization.split('Bearer ')[1];
+    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    const authenticatedUserId = decodedToken.uid;
+
     const { stripeSubscriptionId, userId } = await req.json();
+
+    // Validare crucială: Verificăm dacă utilizatorul autentificat este cel corect
+    if (authenticatedUserId !== userId) {
+        return new NextResponse('Acțiune neautorizată.', { status: 403 });
+    }
     
     console.log(`[CANCEL_API] Request received for userId: ${userId} and subscriptionId: ${stripeSubscriptionId}`);
 
@@ -54,6 +68,9 @@ export async function POST(req: NextRequest) {
 
   } catch (error: unknown) {
     console.error('[CANCEL_API] Unexpected error:', error);
+    if (error instanceof Error && 'code' in error && (error as any).code === 'auth/id-token-expired') {
+        return new NextResponse('Sesiunea a expirat. Te rugăm să te re-autentifici.', { status: 401 });
+    }
     const errorMessage = error instanceof Error ? error.message : 'Eroare internă de server necunoscută.';
     return new NextResponse(`Eroare internă de server: ${errorMessage}`, { status: 500 });
   }
