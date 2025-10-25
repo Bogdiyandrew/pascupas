@@ -19,7 +19,7 @@ Dacă discuția devine critică (gânduri suicidale sau risc iminent), încuraje
 async function streamModel(opts: {
   model: string;
   systemPrompt: string;
-  messages: any[];
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
   signal: AbortSignal;
 }) {
   const completion = await openai.chat.completions.create(
@@ -114,10 +114,10 @@ export async function POST(req: NextRequest) {
         'Cache-Control': 'no-cache, no-transform',
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[CHAT_API_ERROR]', error);
     const msg =
-      error?.message || 'Eroare internă de server necunoscută.';
+      error instanceof Error ? error.message : 'Eroare internă de server necunoscută.';
     return new Response(`Eroare internă de server: ${msg}`, { status: 500 });
   }
 }
