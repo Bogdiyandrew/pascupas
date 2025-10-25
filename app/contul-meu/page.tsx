@@ -3,7 +3,7 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getMessagesRemaining, PLANS } from '@/types/subscription';
+import { PLANS } from '@/types/subscription';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { deleteUser } from 'firebase/auth';
@@ -139,8 +139,9 @@ export default function AccountPage() {
       await updateUserProfile(newProfileData);
       setSaveMessage('Profilul a fost salvat cu succes!');
       setTimeout(() => setSaveMessage(''), 3000); 
-    } catch (error) {
-      console.error('Eroare la salvarea profilului:', error);
+    } catch {
+      // eslint-disable-next-line no-console
+      console.error('Eroare la salvarea profilului');
       setErrorMessage('A apărut o eroare la salvarea profilului.');
     } finally {
       setIsProfileSaving(false);
@@ -169,12 +170,17 @@ export default function AccountPage() {
         await deleteUser(user);
         
         router.push('/');
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Eroare la ștergerea contului:", error);
-        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        if (typeof error === 'object' && error !== null && 'code' in error) {
+          const err = error as { code?: string };
+          if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
             setDeleteError('Parola introdusă este incorectă.');
-        } else {
+          } else {
             setDeleteError('A apărut o eroare la ștergerea contului.');
+          }
+        } else {
+          setDeleteError('A apărut o eroare necunoscută.');
         }
         setIsDeleting(false);
     }
@@ -188,7 +194,6 @@ export default function AccountPage() {
     );
   }
 
-  const { email } = user;
   const { currentPlan, messagesThisMonth, messagesLimit, resetDate } = userDoc;
 
   return (

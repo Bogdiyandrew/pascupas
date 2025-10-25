@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { PLANS, PlanType } from '../../types/subscription';
 
-// --- Iconițe Optimizate ---
-const CrownIcon = ({ className = "h-6 w-6" }: { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 const CheckIcon = ({ className = "h-5 w-5" }: { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
 const ArrowLeftIcon = ({ className = "h-5 w-5" }: { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>;
 const SuccessIcon = ({ className = "h-16 w-16 text-green-500" }: { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>;
@@ -283,7 +281,7 @@ function PlansPageClient() {
               <p>Limita de 15 mesaje pentru planul gratuit se resetează automat în prima zi a fiecărei luni calendaristice.</p>
             </FAQItem>
             <FAQItem question="Pot anula abonamentul oricând?">
-              <p>Da, poți anula abonamentul premium în orice moment din pagina "Contul Meu". Vei avea acces la beneficiile premium până la finalul perioadei de facturare curente.</p>
+              <p>Da, poți anula abonamentul premium în orice moment din pagina &quot;Contul Meu&quot;. Vei avea acces la beneficiile premium până la finalul perioadei de facturare curente.</p>
             </FAQItem>
             <FAQItem question="Ce se întâmplă dacă fac upgrade la mijlocul lunii?">
                 <p>Vei plăti suma proporțional, iar beneficiile planului superior, precum mesajele nelimitate, vor fi activate imediat.</p>
